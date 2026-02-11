@@ -1,8 +1,10 @@
 import logging
+import sys
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
@@ -20,80 +22,84 @@ class Settings(BaseSettings):
     WEBHOOK_URL: str
     ADMIN_USER: str
     ADMIN_PASS: str
-    DATABASE_URL: str  # postgresql+asyncpg://user:pass@db:5432/db_name
-    REDIS_URL: str     # redis://redis:6379/0
+    DATABASE_URL: str
+    REDIS_URL: str
     OPENROUTER_KEY: str
 
     class Config:
         env_file = ".env"
+        # Ignoruj nadmiarowe zmienne w .env (np. komentarze)
+        extra = "ignore" 
 
 settings = Settings()
 
-# --- Logging ---
-logging.basicConfig(level=logging.INFO)
+# --- 🛠️ LOGGING SETUP (FIX) ---
+# To tworzy master.log i jednocześnie wysyła na konsolę Dockera
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout),      # Konsola (Docker logs)
+        logging.FileHandler("app_main.log")     # Plik na dysku (Master Log)
+    ]
+)
 logger = logging.getLogger(__name__)
 
 # --- Infrastructure Setup ---
-# 1. Database
 engine = create_async_engine(settings.DATABASE_URL, echo=False)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
-# 2. Redis & Aiogram Storage
 redis = Redis.from_url(settings.REDIS_URL)
 storage = RedisStorage(redis=redis)
 
-# 3. Bot & Dispatcher
 bot = Bot(token=settings.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher(storage=storage)
 
-# --- Dependency Injection for Routes ---
 async def get_db():
     async with AsyncSessionLocal() as session:
         yield session
 
-# --- Simple Bot Handler (Placeholder for full bot logic) ---
-# In a real app, move these to app/bot/handlers
-@dp.message()
-async def echo_handler(message: types.Message):
-    """
-    Temporary handler to prove bot works. 
-    In production: Call LLM Service here.
-    """
-    # Example: Check DB for user, add message to history, call LLM
-    await message.answer("Bot is active! Configure LLM service in logic.")
-
 # --- FastAPI Lifespan ---
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator:
-    # Startup
-    logger.info("Initializing Database...")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    
-    logger.info(f"Setting Webhook to {settings.WEBHOOK_URL}/webhook")
-    await bot.set_webhook(url=f"{settings.WEBHOOK_URL}/webhook")
-    
-    yield
-    
-    # Shutdown
-    logger.info("Removing Webhook...")
-    await bot.delete_webhook()
-    await engine.dispose()
-    await redis.close()
+    logger.info("🚀 Starting up application...")
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        
+        logger.info(f"Setting Webhook to {settings.WEBHOOK_URL}/webhook")
+        await bot.set_webhook(url=f"{settings.WEBHOOK_URL}/webhook")
+        yield
+    except Exception as e:
+        logger.error(f"❌ Critical Startup Error: {e}", exc_info=True)
+        raise
+    finally:
+        logger.info("🛑 Shutting down...")
+        await bot.delete_webhook()
+        await engine.dispose()
+        await redis.close()
 
-# --- App Initialization ---
 app = FastAPI(lifespan=lifespan, title="AI GFE Bot Admin")
 
-# Mount Admin Router
+# --- 🛡️ GLOBAL EXCEPTION HANDLER (FIX) ---
+# To łapie każdy błąd, który nie został obsłużony ręcznie
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"🔥 UNHANDLED EXCEPTION: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"message": "Internal Server Error. Support has been notified."}
+    )
+
 app.include_router(admin_router, prefix="/admin", tags=["Admin"])
 
-# --- Webhook Endpoint ---
 @app.post("/webhook")
 async def telegram_webhook(request: Request):
-    """
-    Entry point for Telegram updates.
-    """
-    update_data = await request.json()
-    update = types.Update(**update_data)
-    await dp.feed_update(bot=bot, update=update)
-    return {"status": "ok"}
+    try:
+        update_data = await request.json()
+        update = types.Update(**update_data)
+        await dp.feed_update(bot=bot, update=update)
+        return {"status": "ok"}
+    except Exception as e:
+        logger.error(f"⚠️ Webhook Error: {e}", exc_info=True)
+        return {"status": "error", "message": str(e)}
