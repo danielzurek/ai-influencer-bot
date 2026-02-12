@@ -26,10 +26,5 @@ services:
     image: redis:7-alpine
     restart: always
 
-  chroma:
-    image: chromadb/chroma:latest
-    ports:
-      - "8002:8000"
-
 volumes:
   postgres_data:
