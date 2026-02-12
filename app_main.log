@@ -5,3 +5,113 @@
 2026-02-12 15:13:03,743 - app.main - INFO - Starting services...
 2026-02-12 15:13:44,319 - app.web.admin_routes - WARNING - Unauthorized access attempt: admin
 2026-02-12 15:18:40,998 - app.main - INFO - Starting services...
+2026-02-12 15:31:33,157 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 404 Not Found"
+2026-02-12 15:31:33,166 - ERROR - Error: Error code: 404 - {'error': {'message': 'No endpoints found for google/gemini-2.0-flash-exp:free.', 'code': 404}, 'user_id': 'user_2xzC0bmiU6qvAkcEUaU5uPEH91R'}
+Traceback (most recent call last):
+  File "/code/app/main.py", line 48, in chat_handler
+    res = await ai_client.chat.completions.create(
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/openai/resources/chat/completions/completions.py", line 2678, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/openai/_base_client.py", line 1884, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/openai/_base_client.py", line 1669, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'message': 'No endpoints found for google/gemini-2.0-flash-exp:free.', 'code': 404}, 'user_id': 'user_2xzC0bmiU6qvAkcEUaU5uPEH91R'}
+2026-02-12 15:31:33,179 - INFO - Update id=681472620 is handled. Duration 2878 ms by bot id=7756198924
+2026-02-12 15:31:34,989 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 404 Not Found"
+2026-02-12 15:31:34,993 - ERROR - Error: Error code: 404 - {'error': {'message': 'No endpoints found for google/gemini-2.0-flash-exp:free.', 'code': 404}, 'user_id': 'user_2xzC0bmiU6qvAkcEUaU5uPEH91R'}
+Traceback (most recent call last):
+  File "/code/app/main.py", line 48, in chat_handler
+    res = await ai_client.chat.completions.create(
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/openai/resources/chat/completions/completions.py", line 2678, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/openai/_base_client.py", line 1884, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/openai/_base_client.py", line 1669, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.NotFoundError: Error code: 404 - {'error': {'message': 'No endpoints found for google/gemini-2.0-flash-exp:free.', 'code': 404}, 'user_id': 'user_2xzC0bmiU6qvAkcEUaU5uPEH91R'}
+2026-02-12 15:31:34,997 - INFO - Update id=681472621 is handled. Duration 149 ms by bot id=7756198924
+2026-02-12 15:42:53,851 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-12 15:43:05,222 - INFO - Update id=681472622 is handled. Duration 14804 ms by bot id=7756198924
+2026-02-12 15:45:34,902 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-12 15:45:38,119 - INFO - Update id=681472623 is handled. Duration 10650 ms by bot id=7756198924
+2026-02-12 15:45:38,948 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-12 15:45:50,142 - INFO - Update id=681472624 is handled. Duration 11985 ms by bot id=7756198924
+2026-02-12 15:49:19,491 - INFO - Bot jest gotowy i nasłuchuje!
+2026-02-12 15:52:40,741 - INFO - Bot jest gotowy i nasłuchuje!
+2026-02-12 15:53:36,487 - INFO - Nowy użytkownik zarejestrowany: Daniel
+2026-02-12 15:53:40,185 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-12 15:53:42,174 - INFO - Update id=681472625 is handled. Duration 5801 ms by bot id=7756198924
+2026-02-12 15:54:23,636 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-12 15:54:27,042 - ERROR - Chat Error: Telegram server says - Bad Request: message text is empty
+Traceback (most recent call last):
+  File "/code/app/main.py", line 65, in chat_handler
+    await message.answer(ai_text)
+  File "/usr/local/lib/python3.11/site-packages/aiogram/methods/base.py", line 82, in emit
+    return await bot(self)
+           ^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/aiogram/client/bot.py", line 487, in __call__
+    return await self.session(self, method, timeout=request_timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/aiogram/client/session/base.py", line 259, in __call__
+    return cast(TelegramType, await middleware(bot, method))
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/aiogram/client/session/aiohttp.py", line 177, in make_request
+    response = self.check_response(
+               ^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/aiogram/client/session/base.py", line 121, in check_response
+    raise TelegramBadRequest(method=method, message=description)
+aiogram.exceptions.TelegramBadRequest: Telegram server says - Bad Request: message text is empty
+2026-02-12 15:54:27,054 - INFO - Update id=681472626 is handled. Duration 6198 ms by bot id=7756198924
+2026-02-12 15:57:02,670 - INFO - Bot jest gotowy i nasłuchuje!
+2026-02-12 15:57:24,591 - INFO - Nowy użytkownik zarejestrowany: SkyeMiamiFit
+2026-02-12 15:57:28,535 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-12 15:57:28,952 - INFO - Update id=681472627 is handled. Duration 4463 ms by bot id=7756198924
+2026-02-12 15:57:42,610 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-12 15:57:43,944 - ERROR - Chat Error: Telegram server says - Bad Request: message text is empty
+Traceback (most recent call last):
+  File "/code/app/main.py", line 65, in chat_handler
+    await message.answer(ai_text)
+  File "/usr/local/lib/python3.11/site-packages/aiogram/methods/base.py", line 82, in emit
+    return await bot(self)
+           ^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/aiogram/client/bot.py", line 487, in __call__
+    return await self.session(self, method, timeout=request_timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/aiogram/client/session/base.py", line 259, in __call__
+    return cast(TelegramType, await middleware(bot, method))
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/aiogram/client/session/aiohttp.py", line 177, in make_request
+    response = self.check_response(
+               ^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/aiogram/client/session/base.py", line 121, in check_response
+    raise TelegramBadRequest(method=method, message=description)
+aiogram.exceptions.TelegramBadRequest: Telegram server says - Bad Request: message text is empty
+2026-02-12 15:57:43,957 - INFO - Update id=681472628 is handled. Duration 6177 ms by bot id=7756198924
+2026-02-12 15:59:31,762 - INFO - Bot jest gotowy!
+2026-02-12 16:05:08,693 - INFO - Połączono z bazą danych!
+2026-02-12 16:05:08,814 - INFO - Bot jest gotowy i nasłuchuje!
+2026-02-12 16:06:35,337 - INFO - Połączono z bazą danych!
+2026-02-12 16:06:35,501 - INFO - Bot jest gotowy i nasłuchuje!
+2026-02-12 16:06:55,827 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-12 16:06:56,619 - INFO - Update id=681472629 is handled. Duration 7114 ms by bot id=7756198924
+2026-02-12 16:07:13,011 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-12 16:07:25,369 - INFO - Update id=681472630 is handled. Duration 19278 ms by bot id=7756198924
+2026-02-12 16:07:38,304 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-12 16:07:39,156 - INFO - Update id=681472631 is handled. Duration 6435 ms by bot id=7756198924
+2026-02-12 16:08:32,740 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-12 16:08:33,779 - INFO - Update id=681472632 is handled. Duration 7345 ms by bot id=7756198924
+2026-02-12 16:09:30,979 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-12 16:09:31,823 - INFO - Update id=681472633 is handled. Duration 6278 ms by bot id=7756198924
+2026-02-12 16:09:33,150 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-12 16:09:35,206 - INFO - Update id=681472634 is handled. Duration 3345 ms by bot id=7756198924
+2026-02-12 16:09:46,976 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-12 16:10:05,543 - INFO - Update id=681472635 is handled. Duration 19668 ms by bot id=7756198924
+2026-02-12 16:10:53,929 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-12 16:11:08,302 - INFO - Update id=681472636 is handled. Duration 20653 ms by bot id=7756198924

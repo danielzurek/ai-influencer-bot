@@ -19,13 +19,10 @@ def auth(credentials: HTTPBasicCredentials = Depends(security)):
     return credentials.username
 
 @router.get("/", response_class=HTMLResponse)
-@router.get("/users", response_class=HTMLResponse) # DODANO TĘ LINIĘ DLA TWOJEGO BŁĘDU!
+@router.get("/users", response_class=HTMLResponse)
 async def dashboard(request: Request, db: AsyncSession = Depends(get_db), user=Depends(auth)):
-    total = await db.scalar(select(func.count(User.telegram_id)))
     users = (await db.execute(select(User).order_by(desc(User.created_at)))).scalars().all()
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request, "total_users": total, "recent_users": users, "username": user
-    })
+    return templates.TemplateResponse("dashboard.html", {"request": request, "total_users": len(users), "recent_users": users, "username": user})
 
 @router.get("/chat/{user_id}", response_class=HTMLResponse)
 async def chat_viewer(request: Request, user_id: int, db: AsyncSession = Depends(get_db), user=Depends(auth)):

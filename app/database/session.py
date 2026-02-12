@@ -10,19 +10,16 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     REDIS_URL: str
     OPENROUTER_KEY: str
-    
-    # Te dane są wczytywane z Twojego .env
-    AI_MODEL: str = "google/gemini-2.0-flash-exp:free"
+    AI_MODEL: str = "openrouter/free"
     AI_TEMPERATURE: float = 0.8
     AI_MAX_TOKENS: int = 250
-    SYSTEM_PROMPT: str = "Jesteś Kasia, pisz luźno."
+    SYSTEM_PROMPT: str = "Personality"
 
     class Config:
         env_file = ".env"
         extra = "ignore"
 
 settings = Settings()
-
 engine = create_async_engine(settings.DATABASE_URL, echo=False)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
