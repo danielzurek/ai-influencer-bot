@@ -1,108 +1,131 @@
 import logging, sys, asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher, types, F
 from aiogram.client.default import DefaultBotProperties
+from aiogram.client.telegram import TelegramAPIServer
 from aiogram.fsm.storage.redis import RedisStorage
+from aiogram.types import LabeledPrice, PreCheckoutQuery, Message as TGMessage
 from redis.asyncio import Redis
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func
 from openai import AsyncOpenAI
 
 from app.database.models import Base, User, Message
 from app.database.session import settings, engine, AsyncSessionLocal, get_db
 from app.web.admin_routes import router as admin_router
 
-# --- Konfiguracja Logowania ---
+# --- Logowanie ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s',
                     handlers=[logging.StreamHandler(sys.stdout), logging.FileHandler("app_main.log")])
 logger = logging.getLogger(__name__)
 
 # --- Infrastruktura ---
 redis = Redis.from_url(settings.REDIS_URL)
-bot = Bot(token=settings.BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
+
+# KONFIGURACJA TESTOWA: Jeśli używasz Test Servera, odkomentuj linię 'server'
+bot = Bot(
+    token=settings.BOT_TOKEN, 
+    default=DefaultBotProperties(parse_mode="HTML"),
+    # server=TelegramAPIServer.from_base('https://api.telegram.org', is_test=True) 
+)
+
 dp = Dispatcher(storage=RedisStorage(redis=redis))
 ai_client = AsyncOpenAI(api_key=settings.OPENROUTER_KEY, base_url="https://openrouter.ai/api/v1")
 
+# --- 1. PŁATNOŚCI: Komenda /vip (Faktura) ---
+@dp.message(F.text == "/vip")
+async def send_vip_invoice(message: TGMessage):
+    await message.answer_invoice(
+        title="Skye Carter VIP Access 💋",
+        description="Unlock unlimited chats and exclusive uncut content!",
+        payload="vip_30_days",
+        currency="XTR", 
+        prices=[LabeledPrice(label="VIP Access", amount=250)],
+        provider_token="" 
+    )
+
+# --- 2. PŁATNOŚCI: Pre-checkout ---
+@dp.pre_checkout_query()
+async def process_pre_checkout(pre_checkout_query: PreCheckoutQuery):
+    await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
+
+# --- 3. PŁATNOŚCI: Sukces ---
+@dp.message(F.successful_payment)
+async def on_successful_payment(message: TGMessage):
+    user_id = message.from_user.id
+    async with AsyncSessionLocal() as db:
+        user = await db.get(User, user_id)
+        if user:
+            user.is_vip = True
+            await db.commit()
+    
+    await message.answer("Oh my god... thank you! 😍 You've just unlocked VIP access. Now we can talk as much as you want! I have no limits for you anymore... 🔥")
+
+# --- 4. GŁÓWNY HANDLER CZATU ---
 @dp.message()
-async def chat_handler(message: types.Message):
-    if not message.text: return
+async def chat_handler(message: TGMessage):
+    if not message.text or message.successful_payment: return
     user_id = message.from_user.id
     
     try:
         async with AsyncSessionLocal() as db:
-            # 1. Zarządzanie użytkownikiem
+            # Rozpoznawanie użytkownika
             user = await db.get(User, user_id)
             if not user:
                 display_name = message.from_user.username or message.from_user.first_name or f"User_{user_id}"
                 user = User(telegram_id=user_id, username=display_name)
                 db.add(user); await db.commit()
 
-            db.add(Message(user_id=user_id, role="user", content=message.text))
-            await db.commit()
+            # Limit wiadomości dla osób bez VIP-a
+            if not user.is_vip:
+                msg_count = await db.scalar(select(func.count(Message.id)).where(Message.user_id == user_id))
+                if msg_count >= 15:
+                    return await message.answer("hey babe... i'm running out of free minutes for today. 🥺 type /vip so we can keep talking without stopping! 💋")
 
-            # 2. Przygotowanie kontekstu
-            hist = await db.execute(select(Message).where(Message.user_id==user_id).order_by(desc(Message.timestamp)).limit(10))
-            payload = [{"role": "system", "content": settings.SYSTEM_PROMPT}]
-            for m in hist.scalars().all()[::-1]:
-                payload.append({"role": m.role, "content": m.content})
+            db.add(Message(user_id=user_id, role="user", content=message.text)); await db.commit()
 
-            # 3. Zapytanie do AI
+            # Zapytanie do AI
             await bot.send_chat_action(chat_id=user_id, action="typing")
             res = await ai_client.chat.completions.create(
                 model=settings.AI_MODEL, 
-                messages=payload,
-                temperature=settings.AI_TEMPERATURE,
-                max_tokens=settings.AI_MAX_TOKENS
+                messages=[{"role": "system", "content": settings.SYSTEM_PROMPT}, {"role": "user", "content": message.text}]
             )
-            
             ai_text = res.choices[0].message.content or ""
 
-            # --- LOGIKA 3 SCENARIUSZY (FALLBACK) ---
+            # Logika 3 scenariuszy błędów AI (Z emotkami!)
             fail_key = f"fail_tier:{user_id}"
             if not ai_text.strip():
-                # Pobieramy obecny poziom błędu z Redis
                 raw_count = await redis.get(fail_key)
-                count = int(raw_count) if raw_count else 0
-                count += 1
-                # Zapisujemy na 1 godzinę (3600s)
-                await redis.set(fail_key, count, ex=3600) 
-
-                if count == 1:
-                    ai_text = "sorki, tak się zamyśliłam... powtórzysz? 😅"
-                elif count == 2:
-                    ai_text = "robię właśnie coś ważnego, daj mi 10 minut i zaraz wracam! 💋"
-                else:
-                    ai_text = "muszę uciekać, będę jutro! paaa ❤️"
+                count = (int(raw_count) if raw_count else 0) + 1
+                await redis.set(fail_key, count, ex=3600)
                 
-                logger.warning(f"Uruchomiono Fallback Tier {count} dla {user_id}")
+                if count == 1:
+                    ai_text = "sorry, I got so distracted... can you repeat that? 😅"
+                elif count == 2:
+                    ai_text = "i'm doing something important right now, give me 10 mins and I'll be back! 💋"
+                else:
+                    ai_text = "gotta run now, talk to you tomorrow! bye! ❤️"
             else:
-                # Jeśli AI odpowiedziało poprawnie, zerujemy licznik błędów
                 await redis.delete(fail_key)
 
-            # 4. Zapis i wysyłka
-            db.add(Message(user_id=user_id, role="assistant", content=ai_text))
-            await db.commit()
+            db.add(Message(user_id=user_id, role="assistant", content=ai_text)); await db.commit()
             await message.answer(ai_text)
             
     except Exception as e: 
-        logger.error(f"Chat Error: {e}", exc_info=True)
-        await message.answer("oops, małe spięcie! spróbuj za chwilę.")
+        logger.error(f"Error: {e}", exc_info=True)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Czekanie na bazę danych
+    # Czekanie na bazę
     retries = 5
     while retries > 0:
         try:
-            async with engine.begin() as conn:
-                await conn.run_sync(Base.metadata.create_all)
+            async with engine.begin() as conn: await conn.run_sync(Base.metadata.create_all)
             break
         except:
             retries -= 1
             await asyncio.sleep(2)
-
     await bot.set_webhook(url=f"{settings.WEBHOOK_URL}/webhook")
-    logger.info("Bot Kasi jest gotowy!")
     yield
     await bot.delete_webhook()
 

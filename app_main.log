@@ -115,3 +115,4 @@ aiogram.exceptions.TelegramBadRequest: Telegram server says - Bad Request: messa
 2026-02-12 16:10:05,543 - INFO - Update id=681472635 is handled. Duration 19668 ms by bot id=7756198924
 2026-02-12 16:10:53,929 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
 2026-02-12 16:11:08,302 - INFO - Update id=681472636 is handled. Duration 20653 ms by bot id=7756198924
+2026-02-12 16:24:16,672 - INFO - Bot Kasi jest gotowy!
