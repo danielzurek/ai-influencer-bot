@@ -2,54 +2,50 @@
 
 {% block content %}
 <div class="row">
-    <div class="col-md-4 mb-4">
-        <div class="card h-100">
-            <div class="card-header bg-success text-white">Create New Model</div>
+    <div class="col-md-3 mb-4">
+        <div class="card">
+            <div class="card-header bg-success text-white">New Model</div>
             <div class="card-body">
                 <form action="/admin/personas/create" method="post">
                     <div class="mb-3">
-                        <label class="form-label small text-uppercase fw-bold">Model Name</label>
-                        <input type="text" name="name" class="form-control bg-dark text-light border-secondary" placeholder="e.g. Skye Carter" required>
+                        <label class="form-label small fw-bold">Name</label>
+                        <input type="text" name="name" class="form-control bg-dark text-light border-secondary" placeholder="Skye Carter" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label small text-uppercase fw-bold">Telegram Token</label>
-                        <input type="text" name="telegram_token" class="form-control bg-dark text-light border-secondary" placeholder="Leave empty for default">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label small text-uppercase fw-bold">AI Model ID</label>
+                        <label class="form-label small fw-bold">AI Model</label>
                         <input type="text" name="ai_model" class="form-control bg-dark text-light border-secondary" value="openrouter/free">
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label small text-uppercase fw-bold">System Prompt</label>
-                        <textarea name="system_prompt" class="form-control bg-dark text-light border-secondary" rows="8" required></textarea>
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold">Prompt</label>
+                        <textarea name="system_prompt" class="form-control bg-dark text-light border-secondary" rows="5" required></textarea>
                     </div>
-                    <button type="submit" class="btn btn-success w-100">Save & Add</button>
+                    <button type="submit" class="btn btn-success w-100">Add</button>
                 </form>
             </div>
         </div>
     </div>
 
-    <div class="col-md-8">
+    <div class="col-md-9">
         <div class="card">
-            <div class="card-header">Active Models</div>
+            <div class="card-header">Available Models & Statistics</div>
             <div class="card-body p-0">
                 <table class="table table-dark table-hover align-middle mb-0">
                     <thead>
                         <tr>
                             <th class="ps-3">Persona</th>
-                            <th>Model</th>
                             <th>Status</th>
-                            <th class="text-end pe-3">Action</th>
+                            <th>Msgs</th>
+                            <th>Est. Cost</th>
+                            <th class="text-end pe-3">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for persona in personas %}
-                        <tr>
+                        <tr class="{{ 'border-start border-4 border-success' if persona.is_active else '' }}">
                             <td class="ps-3">
-                                <strong>{{ persona.name }}</strong><br>
-                                <small class="text-muted">ID: {{ persona.id }}</small>
+                                <span class="fw-bold">{{ persona.name }}</span><br>
+                                <small class="text-muted">{{ persona.ai_model }}</small>
                             </td>
-                            <td><span class="badge bg-dark border border-secondary">{{ persona.ai_model }}</span></td>
                             <td>
                                 {% if persona.is_active %}
                                 <span class="badge bg-success">ACTIVE 🔥</span>
@@ -57,6 +53,8 @@
                                 <span class="badge bg-secondary">Standby</span>
                                 {% endif %}
                             </td>
+                            <td><span class="text-info fw-bold">{{ persona.stats_msgs }}</span></td>
+                            <td><span class="text-danger">${{ persona.stats_cost }}</span></td>
                             <td class="text-end pe-3">
                                 <div class="d-flex justify-content-end gap-2">
                                     <a href="/admin/personas/{{ persona.id }}" class="btn btn-sm btn-outline-info">Edit</a>

@@ -33,10 +33,21 @@ async def chat_viewer(request: Request, user_id: int, db: AsyncSession = Depends
     msgs = (await db.execute(select(Message).where(Message.user_id == user_id).order_by(Message.timestamp))).scalars().all()
     return templates.TemplateResponse("chat_viewer.html", {"request": request, "chat_user": chat_user, "messages": msgs, "username": user})
 
+# --- MODELS Z DODANYMI STATYSTYKAMI ---
 @router.get("/personas", response_class=HTMLResponse)
 async def personas_list(request: Request, db: AsyncSession = Depends(get_db), user=Depends(auth)):
     result = await db.execute(select(Persona).order_by(Persona.id))
-    return templates.TemplateResponse("personas.html", {"request": request, "personas": result.scalars().all(), "username": user})
+    personas = result.scalars().all()
+    
+    # Prosta statystyka wiadomości (globalna dla demonstracji)
+    msg_count = await db.scalar(select(func.count(Message.id)))
+    
+    # Dodajemy wirtualne statystyki do obiektów (możesz to później rozbudować o kolumny w DB)
+    for p in personas:
+        p.stats_msgs = msg_count if p.is_active else 0 # Uproszczenie
+        p.stats_cost = round(p.stats_msgs * 0.002, 2) # Szacunkowy koszt 0.002$ za wiadomość
+        
+    return templates.TemplateResponse("personas.html", {"request": request, "personas": personas, "username": user})
 
 @router.post("/personas/create")
 async def create_persona(
