@@ -116,3 +116,5 @@ aiogram.exceptions.TelegramBadRequest: Telegram server says - Bad Request: messa
 2026-02-12 16:10:53,929 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
 2026-02-12 16:11:08,302 - INFO - Update id=681472636 is handled. Duration 20653 ms by bot id=7756198924
 2026-02-12 16:24:16,672 - INFO - Bot Kasi jest gotowy!
+2026-02-17 18:12:29,480 - INFO - Seeding Skye Carter...
+2026-02-17 18:12:29,711 - INFO - Booting with persona: Skye Carter | Token ends: ...d-JJ4

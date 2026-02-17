@@ -4,32 +4,32 @@
 <div class="row">
     <div class="col-md-4 mb-4">
         <div class="card h-100">
-            <div class="card-header bg-success text-white">Create New Persona</div>
+            <div class="card-header bg-success text-white fw-bold">Create New Persona</div>
             <div class="card-body">
                 <form action="/admin/personas/create" method="post">
                     <div class="mb-3">
                         <label class="form-label">Persona Name</label>
-                        <input type="text" name="name" class="form-control bg-dark text-light" placeholder="e.g. Luna (Goth)" required>
+                        <input type="text" name="name" class="form-control bg-dark text-light border-secondary" placeholder="e.g. Luna (Goth)" required>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Telegram Bot Token</label>
-                        <input type="text" name="telegram_token" class="form-control bg-dark text-light" placeholder="Leave empty to use .env default">
+                        <input type="text" name="telegram_token" class="form-control bg-dark text-light border-secondary" placeholder="Leave empty to use .env default">
                         <div class="form-text text-muted" style="font-size: 0.8em;">Specific token for this bot instance.</div>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">AI Model ID</label>
-                        <input type="text" name="ai_model" class="form-control bg-dark text-light" value="openrouter/free">
+                        <input type="text" name="ai_model" class="form-control bg-dark text-light border-secondary" value="openrouter/free">
                         <div class="form-text text-muted" style="font-size: 0.8em;">e.g. gryphe/mythomax-l2-13b</div>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">System Prompt</label>
-                        <textarea name="system_prompt" class="form-control bg-dark text-light" rows="10" placeholder="Paste full character prompt here..." required></textarea>
+                        <textarea name="system_prompt" class="form-control bg-dark text-light border-secondary" rows="10" placeholder="Paste full character prompt here..." required></textarea>
                         <div class="form-text text-muted">Include ROLE, BEHAVIOR, and MEMORY instructions.</div>
                     </div>
-                    <button type="submit" class="btn btn-success w-100">Save Persona</button>
+                    <button type="submit" class="btn btn-success w-100 fw-bold">Save Persona</button>
                 </form>
             </div>
         </div>
@@ -37,41 +37,51 @@
 
     <div class="col-md-8">
         <div class="card">
-            <div class="card-header">Available Personas</div>
-            <div class="card-body">
-                <table class="table table-dark table-hover align-middle">
-                    <thead>
+            <div class="card-header bg-dark text-white fw-bold">Available Models</div>
+            <div class="card-body p-0">
+                <table class="table table-dark table-hover align-middle mb-0">
+                    <thead class="table-secondary text-dark">
                         <tr>
-                            <th>Name</th>
+                            <th class="ps-3">Name</th>
                             <th>Model</th>
                             <th>Status</th>
-                            <th>Action</th>
+                            <th class="text-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for persona in personas %}
                         <tr class="{{ 'table-active border-success' if persona.is_active else '' }}">
-                            <td>
+                            <td class="ps-3">
                                 <strong>{{ persona.name }}</strong><br>
                                 <small class="text-muted">ID: {{ persona.id }}</small>
                             </td>
                             <td><span class="badge bg-secondary">{{ persona.ai_model }}</span></td>
                             <td>
                                 {% if persona.is_active %}
-                                <span class="badge bg-success">ACTIVE 🔥</span>
+                                <span class="badge bg-success text-uppercase">Active 🔥</span>
                                 {% else %}
-                                <span class="badge bg-secondary">Standby</span>
+                                <span class="badge bg-outline-secondary text-muted">Standby</span>
                                 {% endif %}
                             </td>
                             <td>
-                                {% if not persona.is_active %}
-                                <form action="/admin/personas/{{ persona.id }}/activate" method="post">
-                                    <button type="submit" class="btn btn-sm btn-outline-warning">Activate</button>
-                                </form>
-                                {% else %}
-                                <button class="btn btn-sm btn-secondary" disabled>Selected</button>
-                                {% endif %}
+                                <div class="d-flex justify-content-center gap-2">
+                                    <a href="/admin/personas/{{ persona.id }}" class="btn btn-sm btn-outline-info">
+                                        Edit
+                                    </a>
+
+                                    {% if not persona.is_active %}
+                                    <form action="/admin/personas/{{ persona.id }}/activate" method="post" class="m-0">
+                                        <button type="submit" class="btn btn-sm btn-outline-warning">Activate</button>
+                                    </form>
+                                    {% else %}
+                                    <button class="btn btn-sm btn-secondary" disabled>Selected</button>
+                                    {% endif %}
+                                </div>
                             </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center py-4 text-muted">No models found. Add your first one!</td>
                         </tr>
                         {% endfor %}
                     </tbody>
