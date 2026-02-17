@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card shadow-lg">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-3">
+                <h5 class="mb-0">Edit Persona: {{ persona.name }}</h5>
+                <a href="/admin/personas" class="btn btn-sm btn-outline-light">Back to List</a>
+            </div>
+            <div class="card-body p-4">
+                <form action="/admin/personas/{{ persona.id }}/update" method="post">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label small text-uppercase fw-bold">Persona Name</label>
+                            <input type="text" name="name" class="form-control bg-dark text-light border-secondary" value="{{ persona.name }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label small text-uppercase fw-bold">AI Model ID</label>
+                            <input type="text" name="ai_model" class="form-control bg-dark text-light border-secondary" value="{{ persona.ai_model }}" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small text-uppercase fw-bold">Telegram Bot Token (Optional)</label>
+                        <input type="text" name="telegram_token" class="form-control bg-dark text-light border-secondary" value="{{ persona.telegram_token or '' }}" placeholder="Using .env default if empty">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small text-uppercase fw-bold">System Prompt</label>
+                        <textarea name="system_prompt" class="form-control bg-dark text-light border-secondary font-monospace" rows="18" required>{{ persona.system_prompt }}</textarea>
+                    </div>
+
+                    <div class="d-grid pt-3">
+                        <button type="submit" class="btn btn-primary btn-lg">Update Model Configuration</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

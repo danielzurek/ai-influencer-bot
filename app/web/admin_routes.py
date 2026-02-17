@@ -18,7 +18,6 @@ def auth(credentials: HTTPBasicCredentials = Depends(security)):
         raise HTTPException(status_code=401, headers={"WWW-Authenticate": "Basic"})
     return credentials.username
 
-# --- DASHBOARD ---
 @router.get("/", response_class=HTMLResponse)
 @router.get("/users", response_class=HTMLResponse)
 async def dashboard(request: Request, db: AsyncSession = Depends(get_db), user=Depends(auth)):
@@ -28,22 +27,12 @@ async def dashboard(request: Request, db: AsyncSession = Depends(get_db), user=D
         "request": request, "total_users": len(users), "vip_users": vip_users, "recent_users": users, "username": user
     })
 
-# --- CZAT VIEWER ---
 @router.get("/chat/{user_id}", response_class=HTMLResponse)
 async def chat_viewer(request: Request, user_id: int, db: AsyncSession = Depends(get_db), user=Depends(auth)):
     chat_user = await db.get(User, user_id)
     msgs = (await db.execute(select(Message).where(Message.user_id == user_id).order_by(Message.timestamp))).scalars().all()
     return templates.TemplateResponse("chat_viewer.html", {"request": request, "chat_user": chat_user, "messages": msgs, "username": user})
 
-@router.post("/users/{user_id}/add_credits")
-async def add_credits(user_id: int, amount: int = Form(...), db: AsyncSession = Depends(get_db), user=Depends(auth)):
-    chat_user = await db.get(User, user_id)
-    if chat_user:
-        chat_user.credits += amount
-        await db.commit()
-    return RedirectResponse(url=f"/admin/chat/{user_id}", status_code=303)
-
-# --- PERSONAS ---
 @router.get("/personas", response_class=HTMLResponse)
 async def personas_list(request: Request, db: AsyncSession = Depends(get_db), user=Depends(auth)):
     result = await db.execute(select(Persona).order_by(Persona.id))
@@ -58,18 +47,30 @@ async def create_persona(
     db: AsyncSession = Depends(get_db), 
     user=Depends(auth)
 ):
-    # Jeśli token pusty, w bazie zapisze się NULL (wtedy używamy fallbacku z .env)
-    token_to_save = telegram_token if telegram_token and telegram_token.strip() else None
-    
-    new_persona = Persona(
-        name=name, 
-        system_prompt=system_prompt, 
-        telegram_token=token_to_save,
-        ai_model=ai_model,
-        is_active=False
-    )
-    db.add(new_persona)
+    token = telegram_token if telegram_token and telegram_token.strip() else None
+    db.add(Persona(name=name, system_prompt=system_prompt, telegram_token=token, ai_model=ai_model, is_active=False))
     await db.commit()
+    return RedirectResponse(url="/admin/personas", status_code=303)
+
+@router.get("/personas/{persona_id}", response_class=HTMLResponse)
+async def edit_persona_page(request: Request, persona_id: int, db: AsyncSession = Depends(get_db), user=Depends(auth)):
+    persona = await db.get(Persona, persona_id)
+    if not persona: raise HTTPException(status_code=404)
+    return templates.TemplateResponse("edit_persona.html", {"request": request, "persona": persona, "username": user})
+
+@router.post("/personas/{persona_id}/update")
+async def update_persona(
+    persona_id: int, name: str = Form(...), system_prompt: str = Form(...), 
+    telegram_token: str = Form(None), ai_model: str = Form(...),
+    db: AsyncSession = Depends(get_db), user=Depends(auth)
+):
+    persona = await db.get(Persona, persona_id)
+    if persona:
+        persona.name = name
+        persona.system_prompt = system_prompt
+        persona.ai_model = ai_model
+        persona.telegram_token = telegram_token if telegram_token and telegram_token.strip() else None
+        await db.commit()
     return RedirectResponse(url="/admin/personas", status_code=303)
 
 @router.post("/personas/{persona_id}/activate")
