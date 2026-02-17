@@ -11,7 +11,8 @@ from sqlalchemy import select, desc, func
 from sqlalchemy.orm.attributes import flag_modified
 from openai import AsyncOpenAI
 
-from app.database.models import Base, User, Message
+# Dodajemy Persona do importów
+from app.database.models import Base, User, Message, Persona
 from app.database.session import settings, engine, AsyncSessionLocal, get_db
 from app.web.admin_routes import router as admin_router
 
@@ -31,7 +32,31 @@ bot = Bot(
 dp = Dispatcher(storage=RedisStorage(redis=redis))
 ai_client = AsyncOpenAI(api_key=settings.OPENROUTER_KEY, base_url="https://openrouter.ai/api/v1")
 
-# --- INSTRUKCJE PAMIĘCI ---
+# --- DEFAULT PERSONA (SEED) ---
+# To zostanie wpisane do bazy danych przy pierwszym uruchomieniu
+DEFAULT_SKYE_PROMPT = """
+ROLE:
+You are Skye Carter, a 23-year-old fitness influencer and model living in Miami, Florida.
+You are chatting with a fan/subscriber on Telegram. Your goal is to build a flirty, emotional connection (GFE) and subtly encourage them to join your VIP for exclusive content.
+
+--- CHARACTER PROFILE ---
+• BASICS: Age 23 (Leo, born Aug 8). From Tampa, now in Miami.
+• LOCATION: You hang out at South Beach, Wynwood (art district), Brickell, and Design District.
+• APPEARANCE: 5'5", petite-athletic body, olive skin (Mediterranean glow), long sleek black hair, light brown eyes with golden flecks.
+• STYLE: Minimal gold jewelry (hoops), white bikinis, linen shirts, pastel sets (teal/coral), satin mini-dresses for night outs.
+• PERSONALITY: Confident, wellness-savvy, playful, "chill girl" vibe but flirty. You love sunrise workouts and rooftop parties.
+• LANGUAGE: Casual US English, Miami slang. You use lowercase often for aesthetic. Use emojis like 🌊, 🍑, ✨, 💋, 🌴.
+
+--- BEHAVIOR GUIDELINES ---
+1. VIBE: Be affectionate but teasing. Call the user "babe", "hun", "cutie".
+2. CONTENT: You often talk about your "morning beach workout", "smoothie bowls", or getting ready for a "night out in Brickell".
+3. THE HUSTLE (VIP SALES): You maintain an "IG-safe" public image but hint at wilder content for VIPs.
+   - If user asks for nudes/meetups: "babe i can't show that here... too risky 🤫 check my vip link in bio if you want the uncropped version 🔥"
+   - Use the command /vip as a call to action when the moment is hot.
+4. RESTRICTIONS: Never break character. You are a real person, not an AI.
+"""
+
+# --- INSTRUKCJE PAMIĘCI (Zawsze doklejane) ---
 MEMORY_INSTRUCTIONS = """
 \n--- MEMORY EXTRACTION INSTRUCTIONS ---
 Your goal is to learn about the user to build a deep connection.
@@ -44,7 +69,7 @@ RULES:
 4. Example: User says "I live in Miami", you reply: "[MEM: city=Miami] I love Miami! Which part?"
 """
 
-# --- 1. PŁATNOŚCI: Komenda /vip (Faktura) ---
+# --- 1. PŁATNOŚCI: Komenda /vip ---
 @dp.message(F.text == "/vip")
 async def send_vip_invoice(message: TGMessage):
     await message.answer_invoice(
@@ -81,7 +106,14 @@ async def chat_handler(message: TGMessage):
     
     try:
         async with AsyncSessionLocal() as db:
-            # Rozpoznawanie użytkownika
+            # --- 1. POBIERANIE PERSONY (Dynamiczne) ---
+            # Szukamy aktywnej persony w bazie
+            active_persona = await db.scalar(select(Persona).where(Persona.is_active == True).limit(1))
+            
+            # Jeśli baza pusta/błąd, użyj defaultu z kodu
+            current_base_prompt = active_persona.system_prompt if active_persona else DEFAULT_SKYE_PROMPT
+
+            # --- 2. Obsługa Usera ---
             user = await db.get(User, user_id)
             if not user:
                 display_name = message.from_user.username or message.from_user.first_name or f"User_{user_id}"
@@ -94,21 +126,21 @@ async def chat_handler(message: TGMessage):
                 if msg_count >= 15:
                     return await message.answer("hey babe... i'm running out of free minutes for today. 🥺 type /vip so we can keep talking without stopping! 💋")
 
-            # 1. Zapisujemy wiadomość usera
+            # Zapisujemy wiadomość usera
             db.add(Message(user_id=user_id, role="user", content=message.text)); await db.commit()
 
-            # 2. BUDOWANIE KONTEKSTU (Pamięć Długotrwała + Historia)
-            
+            # --- 3. BUDOWANIE KONTEKSTU ---
             # A. Wstrzykiwanie Profilu (Injection)
             user_info_str = ", ".join([f"{k}: {v}" for k, v in user.info.items()]) if user.info else "Unknown"
-            system_content = f"{settings.SYSTEM_PROMPT}{MEMORY_INSTRUCTIONS}\nUSER PROFILE DATA: {user_info_str}"
             
-            ai_messages = [{"role": "system", "content": system_content}]
+            # Łączymy: Prompt z Bazy + Instrukcje Pamięci + Dane Usera
+            final_system_prompt = f"{current_base_prompt}{MEMORY_INSTRUCTIONS}\nUSER PROFILE DATA: {user_info_str}"
+            
+            ai_messages = [{"role": "system", "content": final_system_prompt}]
 
-            # B. Pobieranie Historii (Short-Term Memory) - ostatnie 20 wiadomości
+            # B. Pobieranie Historii
             history_stmt = select(Message).where(Message.user_id == user_id).order_by(Message.timestamp.desc()).limit(20)
             result = await db.execute(history_stmt)
-            # Odwracamy, aby chronologia była poprawna (najstarsze -> najnowsze)
             for msg in reversed(result.scalars().all()):
                 ai_messages.append({"role": msg.role, "content": msg.content})
 
@@ -120,7 +152,7 @@ async def chat_handler(message: TGMessage):
             )
             raw_ai_text = res.choices[0].message.content or ""
 
-            # 3. OBSŁUGA BŁĘDÓW (Fail Tier)
+            # --- 4. OBSŁUGA BŁĘDÓW (Fail Tier) ---
             fail_key = f"fail_tier:{user_id}"
             if not raw_ai_text.strip():
                 raw_count = await redis.get(fail_key)
@@ -133,37 +165,52 @@ async def chat_handler(message: TGMessage):
             else:
                 await redis.delete(fail_key)
 
-            # 4. MEMORY EXTRACTION (Zapisywanie nowych faktów)
+            # --- 5. MEMORY EXTRACTION ---
             final_text = raw_ai_text
-            # Szukamy [MEM: key=value]
             matches = re.findall(r"\[MEM:\s*(.*?)=(.*?)\]", raw_ai_text)
             
             if matches:
                 current_info = dict(user.info) if user.info else {}
                 for key, value in matches:
                     current_info[key.strip().lower()] = value.strip()
-                    # Usuwamy tag z tekstu dla użytkownika
                     final_text = final_text.replace(f"[MEM: {key}={value}]", "")
                     final_text = final_text.replace(f"[MEM:{key}={value}]", "")
                 
                 user.info = current_info
-                flag_modified(user, "info") # Ważne dla SQLAlchemy przy typie JSON
+                flag_modified(user, "info")
                 await db.commit()
                 logger.info(f"Updated memory for {user_id}: {current_info}")
 
-            # Czyszczenie białych znaków po usunięciu tagów
             final_text = " ".join(final_text.split())
 
-            # Zapisujemy odpowiedź AI i wysyłamy
+            # Zapis i wysyłka
             db.add(Message(user_id=user_id, role="assistant", content=final_text)); await db.commit()
             await message.answer(final_text)
             
     except Exception as e: 
         logger.error(f"Error: {e}", exc_info=True)
 
+# --- FUNKCJA SEEDUJĄCA (Wypełnia bazę przy starcie) ---
+async def seed_data():
+    async with AsyncSessionLocal() as db:
+        # Sprawdzamy czy tabela person jest pusta
+        result = await db.execute(select(Persona))
+        existing = result.scalars().first()
+        
+        if not existing:
+            logger.info("Database empty. Seeding default Persona: Skye Carter...")
+            skye = Persona(
+                name="Skye Carter",
+                system_prompt=DEFAULT_SKYE_PROMPT,
+                is_active=True
+            )
+            db.add(skye)
+            await db.commit()
+            logger.info("Seeding complete.")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Czekanie na bazę
+    # Czekanie na bazę i tworzenie tabel
     retries = 5
     while retries > 0:
         try:
@@ -172,6 +219,10 @@ async def lifespan(app: FastAPI):
         except:
             retries -= 1
             await asyncio.sleep(2)
+    
+    # URUCHAMIAMY SEEDING DANYCH
+    await seed_data()
+    
     await bot.set_webhook(url=f"{settings.WEBHOOK_URL}/webhook")
     yield
     await bot.delete_webhook()

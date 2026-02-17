@@ -14,7 +14,7 @@ class User(Base):
     is_vip: Mapped[bool] = mapped_column(Boolean, default=False)
     credits: Mapped[int] = mapped_column(default=10)
     
-    # NOWE POLE: Pamięć długotrwała
+    # Pamięć długotrwała
     info: Mapped[dict] = mapped_column(JSON, default={})
     
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
@@ -37,3 +37,14 @@ class Transaction(Base):
     amount: Mapped[float] = mapped_column(Float)
     status: Mapped[str] = mapped_column(String(20))
     user: Mapped["User"] = relationship("User", back_populates="transactions")
+
+# --- NOWA TABELA: PERSONY ---
+class Persona(Base):
+    __tablename__ = "personas"
+    
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(100))      # np. "Skye Carter"
+    system_prompt: Mapped[str] = mapped_column(Text)    # Cała osobowość
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False) # Czy ta persona ma odpowiadać?
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
