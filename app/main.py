@@ -1,4 +1,4 @@
-import logging, sys, asyncio
+import logging, sys, asyncio, re
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from aiogram import Bot, Dispatcher, types, F
@@ -8,6 +8,7 @@ from aiogram.fsm.storage.redis import RedisStorage
 from aiogram.types import LabeledPrice, PreCheckoutQuery, Message as TGMessage
 from redis.asyncio import Redis
 from sqlalchemy import select, desc, func
+from sqlalchemy.orm.attributes import flag_modified
 from openai import AsyncOpenAI
 
 from app.database.models import Base, User, Message
@@ -22,15 +23,26 @@ logger = logging.getLogger(__name__)
 # --- Infrastruktura ---
 redis = Redis.from_url(settings.REDIS_URL)
 
-# KONFIGURACJA TESTOWA: Jeśli używasz Test Servera, odkomentuj linię 'server'
 bot = Bot(
     token=settings.BOT_TOKEN, 
     default=DefaultBotProperties(parse_mode="HTML"),
-    # server=TelegramAPIServer.from_base('https://api.telegram.org', is_test=True) 
 )
 
 dp = Dispatcher(storage=RedisStorage(redis=redis))
 ai_client = AsyncOpenAI(api_key=settings.OPENROUTER_KEY, base_url="https://openrouter.ai/api/v1")
+
+# --- INSTRUKCJE PAMIĘCI ---
+MEMORY_INSTRUCTIONS = """
+\n--- MEMORY EXTRACTION INSTRUCTIONS ---
+Your goal is to learn about the user to build a deep connection.
+If the user mentions specific details (name, age, city, job, hobbies, kinks, pets, etc.), output a memory tag [MEM: key=value] at the start of your response.
+
+RULES:
+1. Format: [MEM: key=value]
+2. Use snake_case for keys (e.g. 'pet_name', 'favorite_color').
+3. Keep values concise.
+4. Example: User says "I live in Miami", you reply: "[MEM: city=Miami] I love Miami! Which part?"
+"""
 
 # --- 1. PŁATNOŚCI: Komenda /vip (Faktura) ---
 @dp.message(F.text == "/vip")
@@ -73,7 +85,7 @@ async def chat_handler(message: TGMessage):
             user = await db.get(User, user_id)
             if not user:
                 display_name = message.from_user.username or message.from_user.first_name or f"User_{user_id}"
-                user = User(telegram_id=user_id, username=display_name)
+                user = User(telegram_id=user_id, username=display_name, info={})
                 db.add(user); await db.commit()
 
             # Limit wiadomości dla osób bez VIP-a
@@ -82,34 +94,69 @@ async def chat_handler(message: TGMessage):
                 if msg_count >= 15:
                     return await message.answer("hey babe... i'm running out of free minutes for today. 🥺 type /vip so we can keep talking without stopping! 💋")
 
+            # 1. Zapisujemy wiadomość usera
             db.add(Message(user_id=user_id, role="user", content=message.text)); await db.commit()
+
+            # 2. BUDOWANIE KONTEKSTU (Pamięć Długotrwała + Historia)
+            
+            # A. Wstrzykiwanie Profilu (Injection)
+            user_info_str = ", ".join([f"{k}: {v}" for k, v in user.info.items()]) if user.info else "Unknown"
+            system_content = f"{settings.SYSTEM_PROMPT}{MEMORY_INSTRUCTIONS}\nUSER PROFILE DATA: {user_info_str}"
+            
+            ai_messages = [{"role": "system", "content": system_content}]
+
+            # B. Pobieranie Historii (Short-Term Memory) - ostatnie 20 wiadomości
+            history_stmt = select(Message).where(Message.user_id == user_id).order_by(Message.timestamp.desc()).limit(20)
+            result = await db.execute(history_stmt)
+            # Odwracamy, aby chronologia była poprawna (najstarsze -> najnowsze)
+            for msg in reversed(result.scalars().all()):
+                ai_messages.append({"role": msg.role, "content": msg.content})
 
             # Zapytanie do AI
             await bot.send_chat_action(chat_id=user_id, action="typing")
             res = await ai_client.chat.completions.create(
                 model=settings.AI_MODEL, 
-                messages=[{"role": "system", "content": settings.SYSTEM_PROMPT}, {"role": "user", "content": message.text}]
+                messages=ai_messages
             )
-            ai_text = res.choices[0].message.content or ""
+            raw_ai_text = res.choices[0].message.content or ""
 
-            # Logika 3 scenariuszy błędów AI (Z emotkami!)
+            # 3. OBSŁUGA BŁĘDÓW (Fail Tier)
             fail_key = f"fail_tier:{user_id}"
-            if not ai_text.strip():
+            if not raw_ai_text.strip():
                 raw_count = await redis.get(fail_key)
                 count = (int(raw_count) if raw_count else 0) + 1
                 await redis.set(fail_key, count, ex=3600)
                 
-                if count == 1:
-                    ai_text = "sorry, I got so distracted... can you repeat that? 😅"
-                elif count == 2:
-                    ai_text = "i'm doing something important right now, give me 10 mins and I'll be back! 💋"
-                else:
-                    ai_text = "gotta run now, talk to you tomorrow! bye! ❤️"
+                if count == 1: raw_ai_text = "sorry, I got so distracted... can you repeat that? 😅"
+                elif count == 2: raw_ai_text = "i'm doing something important right now, give me 10 mins and I'll be back! 💋"
+                else: raw_ai_text = "gotta run now, talk to you tomorrow! bye! ❤️"
             else:
                 await redis.delete(fail_key)
 
-            db.add(Message(user_id=user_id, role="assistant", content=ai_text)); await db.commit()
-            await message.answer(ai_text)
+            # 4. MEMORY EXTRACTION (Zapisywanie nowych faktów)
+            final_text = raw_ai_text
+            # Szukamy [MEM: key=value]
+            matches = re.findall(r"\[MEM:\s*(.*?)=(.*?)\]", raw_ai_text)
+            
+            if matches:
+                current_info = dict(user.info) if user.info else {}
+                for key, value in matches:
+                    current_info[key.strip().lower()] = value.strip()
+                    # Usuwamy tag z tekstu dla użytkownika
+                    final_text = final_text.replace(f"[MEM: {key}={value}]", "")
+                    final_text = final_text.replace(f"[MEM:{key}={value}]", "")
+                
+                user.info = current_info
+                flag_modified(user, "info") # Ważne dla SQLAlchemy przy typie JSON
+                await db.commit()
+                logger.info(f"Updated memory for {user_id}: {current_info}")
+
+            # Czyszczenie białych znaków po usunięciu tagów
+            final_text = " ".join(final_text.split())
+
+            # Zapisujemy odpowiedź AI i wysyłamy
+            db.add(Message(user_id=user_id, role="assistant", content=final_text)); await db.commit()
+            await message.answer(final_text)
             
     except Exception as e: 
         logger.error(f"Error: {e}", exc_info=True)

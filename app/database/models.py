@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import BigInteger, String, Boolean, DateTime, ForeignKey, Text, Float
+from sqlalchemy import BigInteger, String, Boolean, DateTime, ForeignKey, Text, Float, JSON
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.ext.asyncio import AsyncAttrs
 
@@ -13,6 +13,10 @@ class User(Base):
     username: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     is_vip: Mapped[bool] = mapped_column(Boolean, default=False)
     credits: Mapped[int] = mapped_column(default=10)
+    
+    # NOWE POLE: Pamięć długotrwała
+    info: Mapped[dict] = mapped_column(JSON, default={})
+    
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     messages: Mapped[list["Message"]] = relationship("Message", back_populates="user")
     transactions: Mapped[list["Transaction"]] = relationship("Transaction", back_populates="user")
