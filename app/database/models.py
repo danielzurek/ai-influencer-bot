@@ -14,7 +14,7 @@ class User(Base):
     is_vip: Mapped[bool] = mapped_column(Boolean, default=False)
     credits: Mapped[int] = mapped_column(default=10)
     
-    # Pamięć długotrwała
+    # Pamięć długotrwała (JSON)
     info: Mapped[dict] = mapped_column(JSON, default={})
     
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
@@ -38,13 +38,17 @@ class Transaction(Base):
     status: Mapped[str] = mapped_column(String(20))
     user: Mapped["User"] = relationship("User", back_populates="transactions")
 
-# --- NOWA TABELA: PERSONY ---
+# --- TABELA PERSONY (Zaktualizowana) ---
 class Persona(Base):
     __tablename__ = "personas"
     
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(100))      # np. "Skye Carter"
-    system_prompt: Mapped[str] = mapped_column(Text)    # Cała osobowość
-    is_active: Mapped[bool] = mapped_column(Boolean, default=False) # Czy ta persona ma odpowiadać?
+    name: Mapped[str] = mapped_column(String(100))
+    system_prompt: Mapped[str] = mapped_column(Text)
     
+    # Nowe pola konfiguracyjne
+    telegram_token: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    ai_model: Mapped[str] = mapped_column(String(100), default="openrouter/free")
+    
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
