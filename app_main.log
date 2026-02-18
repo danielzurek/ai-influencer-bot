@@ -208,3 +208,6 @@ aiogram.exceptions.TelegramBadRequest: Telegram server says - Bad Request: messa
 2026-02-18 21:50:33,577 - INFO - --- BOT ACTIVE: Skye Carter (Model: openrouter/free) ---
 2026-02-18 22:08:50,479 - INFO - --- BOT ACTIVE: Skye Carter (Model: openrouter/free) ---
 2026-02-18 22:08:58,874 - INFO - --- BOT ACTIVE: Skye Carter (Model: openrouter/free) ---
+2026-02-18 22:09:08,718 - INFO - --- BOT ACTIVE: Skye Carter (Model: openrouter/free) ---
+2026-02-18 22:09:22,150 - INFO - Broadcast finished. Sent: 1, Failed: 0
+2026-02-18 22:14:15,202 - INFO - --- BOT ACTIVE: Skye Carter (Model: openrouter/free) ---
