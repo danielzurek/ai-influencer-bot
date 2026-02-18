@@ -63,6 +63,15 @@ async def delete_persona(persona_id: int, db: AsyncSession = Depends(get_db), us
     await db.commit()
     return RedirectResponse(url="/admin/personas", status_code=303)
 
+# --- DEAKTYWACJA MODELKI ---
+@router.post("/personas/{persona_id}/deactivate")
+async def deactivate_persona(persona_id: int, db: AsyncSession = Depends(get_db), user=Depends(auth)):
+    persona = await db.get(Persona, persona_id)
+    if persona:
+        persona.is_active = False
+        await db.commit()
+    return RedirectResponse(url="/admin/personas", status_code=303)
+
 @router.post("/personas/create")
 async def create_persona(
     name: str = Form(...), 

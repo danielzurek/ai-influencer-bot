@@ -9,19 +9,26 @@
                 <form action="/admin/personas/create" method="post">
                     <div class="mb-3">
                         <label class="form-label small fw-bold text-uppercase">Name</label>
-                        <input type="text" name="name" class="form-control bg-dark text-light border-secondary" placeholder="e.g. Luna Goth" required>
+                        <input type="text" name="name" class="form-control bg-dark text-light border-secondary"
+                            placeholder="e.g. Luna Goth" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label small fw-bold text-uppercase">AI Model ID</label>
-                        <input type="text" name="ai_model" class="form-control bg-dark text-light border-secondary" value="openrouter/free">
+                        <input type="text" name="ai_model" class="form-control bg-dark text-light border-secondary"
+                            value="openrouter/free">
                     </div>
                     <div class="mb-3">
                         <label class="form-label small fw-bold text-uppercase">Telegram Token</label>
-                        <input type="text" name="telegram_token" class="form-control bg-dark text-light border-secondary" placeholder="Leave empty for default">
+                        <input type="text" name="telegram_token"
+                            class="form-control bg-dark text-light border-secondary"
+                            placeholder="Leave empty for default">
+                        <div class="form-text text-muted" style="font-size: 0.75rem;">Specific bot token for this
+                            persona.</div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label small fw-bold text-uppercase">System Prompt</label>
-                        <textarea name="system_prompt" class="form-control bg-dark text-light border-secondary" rows="6" required></textarea>
+                        <textarea name="system_prompt" class="form-control bg-dark text-light border-secondary" rows="6"
+                            placeholder="Define behavior..." required></textarea>
                     </div>
                     <button type="submit" class="btn btn-success w-100 fw-bold">Add Persona</button>
                 </form>
@@ -31,54 +38,69 @@
 
     <div class="col-md-9">
         <div class="card shadow-sm">
-            <div class="card-header">Available Models & Performance</div>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Available Models & Performance</span>
+                <span class="badge bg-dark border border-secondary text-muted">Real-time stats</span>
+            </div>
             <div class="card-body p-0">
-                <table class="table table-dark table-hover align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th class="ps-3">Persona</th>
-                            <th>Status</th>
-                            <th class="text-center">Msgs</th>
-                            <th class="text-center">Est. Cost</th>
-                            <th class="text-end pe-3">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for persona in personas %}
-                        <tr class="{{ 'border-start border-4 border-success' if persona.is_active else '' }}">
-                            <td class="ps-3">
-                                <span class="fw-bold">{{ persona.name }}</span><br>
-                                <small class="text-muted">{{ persona.ai_model }}</small>
-                            </td>
-                            <td>
-                                {% if persona.is_active %}
-                                <span class="badge bg-success">ACTIVE 🔥</span>
-                                {% else %}
-                                <span class="badge bg-secondary">Standby</span>
-                                {% endif %}
-                            </td>
-                            <td class="text-center"><span class="text-info fw-bold">{{ persona.stats_msgs }}</span></td>
-                            <td class="text-center"><span class="text-danger">${{ persona.stats_cost }}</span></td>
-                            <td class="text-end pe-3">
-                                <div class="d-flex justify-content-end gap-2">
-                                    <a href="/admin/personas/{{ persona.id }}" class="btn btn-sm btn-outline-info">Edit</a>
-                                    
-                                    {% if not persona.is_active %}
-                                    <form action="/admin/personas/{{ persona.id }}/activate" method="post">
-                                        <button type="submit" class="btn btn-sm btn-warning">Activate</button>
-                                    </form>
-                                    <form action="/admin/personas/{{ persona.id }}/delete" method="post" onsubmit="return confirm('Are you sure you want to delete this persona?');">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                                    </form>
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-3">Persona</th>
+                                <th>Status</th>
+                                <th class="text-center">Msgs</th>
+                                <th class="text-center">Est. Cost</th>
+                                <th class="text-end pe-3">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for persona in personas %}
+                            <tr class="{{ 'border-start border-4 border-success' if persona.is_active else '' }}">
+                                <td class="ps-3">
+                                    <span class="fw-bold">{{ persona.name }}</span><br>
+                                    <small class="text-muted">{{ persona.ai_model }}</small>
+                                </td>
+                                <td>
+                                    {% if persona.is_active %}
+                                    <span class="badge bg-success">ACTIVE 🔥</span>
                                     {% else %}
-                                    <button class="btn btn-sm btn-dark border-secondary" disabled>Selected</button>
+                                    <span class="badge bg-secondary">Standby</span>
                                     {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                                </td>
+                                <td class="text-center"><span class="text-info fw-bold">{{ persona.stats_msgs }}</span>
+                                </td>
+                                <td class="text-center"><span class="text-danger">${{ persona.stats_cost }}</span></td>
+                                <td class="text-end pe-3">
+                                    <div class="d-flex justify-content-end gap-2">
+                                        <a href="/admin/personas/{{ persona.id }}"
+                                            class="btn btn-sm btn-outline-info">Edit</a>
+
+                                        {% if not persona.is_active %}
+                                        <form action="/admin/personas/{{ persona.id }}/activate" method="post">
+                                            <button type="submit" class="btn btn-sm btn-warning">Activate</button>
+                                        </form>
+                                        <form action="/admin/personas/{{ persona.id }}/delete" method="post"
+                                            onsubmit="return confirm('Are you sure you want to delete this persona?');">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                        </form>
+                                        {% else %}
+                                        <form action="/admin/personas/{{ persona.id }}/deactivate" method="post">
+                                            <button type="submit" class="btn btn-sm btn-danger">Deactivate</button>
+                                        </form>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4 text-muted">No models found. Create your first
+                                    persona to start.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
