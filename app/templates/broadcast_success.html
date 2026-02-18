@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="text-center mt-5">
+    <h1 class="display-4 text-success">🚀 Broadcast Started!</h1>
+    <p class="lead text-muted">The system is sending your message to <span class="text-white fw-bold">{{ count }}</span> users in the background.</p>
+    <hr class="my-4 mx-auto" style="width: 50%;">
+    <a href="/admin/broadcast" class="btn btn-outline-light">Send Another</a>
+    <a href="/admin" class="btn btn-primary ms-2">Back to Dashboard</a>
+</div>
+{% endblock %}

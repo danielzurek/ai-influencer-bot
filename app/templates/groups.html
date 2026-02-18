@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4 mb-4">
+        <div class="card shadow-sm border-secondary">
+            <div class="card-header bg-secondary text-white fw-bold">Create Group</div>
+            <div class="card-body">
+                <form action="/admin/groups/create" method="post">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-uppercase">Group Name</label>
+                        <input type="text" name="name" class="form-control" placeholder="VIP Members" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-uppercase">Description</label>
+                        <textarea name="description" class="form-control" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-light w-100 fw-bold">Create Group</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-header">User Segments</div>
+            <div class="card-body p-0">
+                <table class="table table-dark table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-3">Group Name</th>
+                            <th class="text-center">Members</th>
+                            <th class="text-end pe-3">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for group in groups %}
+                        <tr>
+                            <td class="ps-3">
+                                <span class="fw-bold">{{ group.name }}</span><br>
+                                <small class="text-muted">{{ group.description or "No description" }}</small>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-primary rounded-pill">{{ group.users|length }}</span>
+                            </td>
+                            <td class="text-end pe-3">
+                                <a href="/admin/groups/{{ group.id }}" class="btn btn-sm btn-outline-info">Manage</a>
+                                
+                                <form action="/admin/groups/{{ group.id }}/delete" method="post" class="d-inline" onsubmit="return confirm('Delete this group? Users will not be deleted.');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Del</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="text-center py-4 text-muted">No groups created yet.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

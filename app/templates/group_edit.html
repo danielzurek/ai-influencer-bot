@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header bg-info text-dark fw-bold">Edit Group</div>
+            <div class="card-body">
+                <form action="/admin/groups/{{ group.id }}/update" method="post">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-uppercase">Name</label>
+                        <input type="text" name="name" class="form-control" value="{{ group.name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-uppercase">Description</label>
+                        <textarea name="description" class="form-control" rows="3">{{ group.description }}</textarea>
+                    </div>
+                    <button type="submit" class="btn btn-info w-100">Update Details</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header fw-bold">Add User to Group</div>
+            <div class="card-body">
+                <form action="/admin/groups/{{ group.id }}/add_user" method="post">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-uppercase">Select User</label>
+                        <select name="user_id" class="form-select" size="10">
+                            {% for u in all_users %}
+                                <option value="{{ u.telegram_id }}">{{ u.username }} ({{ u.telegram_id }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">Add Selected</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Group Members</span>
+                <span class="badge bg-secondary">{{ group.users|length }} users</span>
+            </div>
+            <div class="card-body p-0" style="max-height: 600px; overflow-y: auto;">
+                <table class="table table-dark table-hover align-middle mb-0">
+                    <thead>
+                        <tr><th>User</th><th>Joined</th><th class="text-end">Action</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for user in group.users %}
+                        <tr>
+                            <td>
+                                {{ user.username or "Anonymous" }}<br>
+                                <code class="text-muted">{{ user.telegram_id }}</code>
+                            </td>
+                            <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
+                            <td class="text-end">
+                                <form action="/admin/groups/{{ group.id }}/remove_user" method="post">
+                                    <input type="hidden" name="user_id" value="{{ user.telegram_id }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="text-center py-4 text-muted">This group has no members.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

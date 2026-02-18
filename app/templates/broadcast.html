@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow-lg border-info">
+            <div class="card-header bg-info text-dark d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold">📢 Mass Broadcast</h5>
+                <small>Send messages to your audience</small>
+            </div>
+            <div class="card-body p-4">
+                <form action="/admin/broadcast/send" method="post">
+                    
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-uppercase text-warning">1. Select Audience</label>
+                        
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio" name="target_type" id="targetAll" value="all" checked onchange="toggleGroups(false)">
+                            <label class="form-check-label" for="targetAll">
+                                All Users (Everyone in database)
+                            </label>
+                        </div>
+                        
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio" name="target_type" id="targetGroups" value="groups" onchange="toggleGroups(true)">
+                            <label class="form-check-label" for="targetGroups">
+                                Specific Groups Only
+                            </label>
+                        </div>
+
+                        <div id="groupSelection" class="ps-4 mt-2 border-start border-secondary" style="display: none;">
+                            <small class="text-muted d-block mb-2">Check groups to include:</small>
+                            {% for group in groups %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="group_ids" value="{{ group.id }}" id="g_{{ group.id }}">
+                                <label class="form-check-label" for="g_{{ group.id }}">
+                                    {{ group.name }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-uppercase text-warning">2. Message Content</label>
+                        <textarea name="message_text" class="form-control font-monospace" rows="6" placeholder="Hey babe! I just posted a new photo... 📸" required></textarea>
+                        <div class="form-text text-muted">Supports HTML formatting (bold, italic, links).</div>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-lg btn-primary fw-bold" onclick="return confirm('Are you sure you want to send this message? This action cannot be undone.')">
+                            🚀 Launch Broadcast
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleGroups(show) {
+        document.getElementById('groupSelection').style.display = show ? 'block' : 'none';
+    }
+</script>
+{% endblock %}

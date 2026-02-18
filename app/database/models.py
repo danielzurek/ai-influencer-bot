@@ -1,11 +1,19 @@
 from datetime import datetime
-from typing import Optional
-from sqlalchemy import BigInteger, String, Boolean, DateTime, ForeignKey, Text, Float, JSON
+from typing import Optional, List
+from sqlalchemy import BigInteger, String, Boolean, DateTime, ForeignKey, Text, Float, JSON, Table, Column
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.ext.asyncio import AsyncAttrs
 
 class Base(AsyncAttrs, DeclarativeBase):
     pass
+
+# --- TABELA ŁĄCZĄCA (Many-to-Many) ---
+user_groups = Table(
+    "user_groups",
+    Base.metadata,
+    Column("user_id", ForeignKey("users.telegram_id", ondelete="CASCADE"), primary_key=True),
+    Column("group_id", ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True),
+)
 
 class User(Base):
     __tablename__ = "users"
@@ -18,8 +26,23 @@ class User(Base):
     info: Mapped[dict] = mapped_column(JSON, default={})
     
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
-    messages: Mapped[list["Message"]] = relationship("Message", back_populates="user")
-    transactions: Mapped[list["Transaction"]] = relationship("Transaction", back_populates="user")
+    
+    # Relacje
+    messages: Mapped[List["Message"]] = relationship("Message", back_populates="user")
+    transactions: Mapped[List["Transaction"]] = relationship("Transaction", back_populates="user")
+    
+    # NOWE: Relacja do grup
+    groups: Mapped[List["Group"]] = relationship("Group", secondary=user_groups, back_populates="users")
+
+class Group(Base):
+    __tablename__ = "groups"
+    
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True)
+    description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    
+    # Relacja do userów
+    users: Mapped[List["User"]] = relationship("User", secondary=user_groups, back_populates="groups")
 
 class Message(Base):
     __tablename__ = "messages"
@@ -38,7 +61,6 @@ class Transaction(Base):
     status: Mapped[str] = mapped_column(String(20))
     user: Mapped["User"] = relationship("User", back_populates="transactions")
 
-# --- TABELA PERSONY (Zaktualizowana) ---
 class Persona(Base):
     __tablename__ = "personas"
     
@@ -46,7 +68,6 @@ class Persona(Base):
     name: Mapped[str] = mapped_column(String(100))
     system_prompt: Mapped[str] = mapped_column(Text)
     
-    # Nowe pola konfiguracyjne
     telegram_token: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     ai_model: Mapped[str] = mapped_column(String(100), default="openrouter/free")
     
