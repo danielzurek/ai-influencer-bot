@@ -187,3 +187,18 @@ aiogram.exceptions.TelegramBadRequest: Telegram server says - Bad Request: messa
 2026-02-18 16:31:26,671 - INFO - --- BOT HOT RELOAD: OFFLINE ---
 2026-02-18 16:36:29,630 - INFO - --- BOT HOT RELOAD: OFFLINE ---
 2026-02-18 16:36:59,549 - INFO - Update id=512875280 is handled. Duration 214 ms by bot id=7756198924
+2026-02-18 16:39:56,927 - INFO - --- ALL MODELS INACTIVE: BOT OFFLINE ---
+2026-02-18 16:42:46,222 - INFO - --- ALL MODELS INACTIVE: BOT OFFLINE ---
+2026-02-18 16:43:15,837 - INFO - --- BOT ACTIVE: Luna Goth ---
+2026-02-18 16:43:29,460 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-18 16:43:29,783 - INFO - Update id=512875282 is handled. Duration 4170 ms by bot id=8440701862
+2026-02-18 16:43:46,890 - INFO - Closing bot session...
+2026-02-18 16:43:47,142 - INFO - --- ALL MODELS INACTIVE: BOT OFFLINE ---
+2026-02-18 16:44:04,932 - INFO - --- BOT ACTIVE: Skye Carter ---
+2026-02-18 16:44:27,354 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-18 16:44:33,966 - INFO - Update id=681472637 is handled. Duration 11717 ms by bot id=7756198924
+2026-02-18 21:27:18,030 - INFO - --- BOT ACTIVE: Skye Carter ---
+2026-02-18 21:29:28,776 - INFO - --- BOT ACTIVE: Skye Carter ---
+2026-02-18 21:29:46,270 - INFO - --- BOT ACTIVE: Skye Carter (Model: openrouter/free) ---
+2026-02-18 21:29:57,815 - INFO - --- BOT ACTIVE: Skye Carter (Model: openrouter/free) ---
+2026-02-18 21:31:42,228 - INFO - --- BOT ACTIVE: Skye Carter (Model: openrouter/free) ---
