@@ -137,3 +137,53 @@ aiogram.exceptions.TelegramBadRequest: Telegram server says - Bad Request: messa
 2026-02-18 16:10:54,643 - INFO - --- BOT HOT RELOAD ---
 2026-02-18 16:10:54,654 - INFO - Active Persona: Luna Goth
 2026-02-18 16:10:54,657 - INFO - Token ends: ...iknuc
+2026-02-18 16:11:03,038 - INFO - --- BOT HOT RELOAD ---
+2026-02-18 16:11:03,039 - INFO - Active Persona: Luna Goth
+2026-02-18 16:11:03,040 - INFO - Token ends: ...iknuc
+2026-02-18 16:13:53,412 - INFO - --- BOT HOT RELOAD ---
+2026-02-18 16:13:53,413 - INFO - Active Persona: Luna Goth
+2026-02-18 16:13:53,414 - INFO - Token ends: ...iknuc
+2026-02-18 16:17:46,934 - INFO - --- BOT HOT RELOAD ---
+2026-02-18 16:17:46,935 - INFO - Active Persona: Luna Goth
+2026-02-18 16:17:46,935 - INFO - Token ends: ...iknuc
+2026-02-18 16:18:09,144 - INFO - --- BOT HOT RELOAD ---
+2026-02-18 16:18:09,145 - INFO - Active Persona: Luna Goth
+2026-02-18 16:18:09,146 - INFO - Token ends: ...iknuc
+2026-02-18 16:20:36,590 - INFO - --- BOT HOT RELOAD ---
+2026-02-18 16:20:36,592 - INFO - Active Persona: Luna Goth
+2026-02-18 16:20:36,597 - INFO - Token ends: ...iknuc
+2026-02-18 16:20:46,979 - INFO - --- BOT HOT RELOAD ---
+2026-02-18 16:20:46,981 - INFO - Active Persona: Luna Goth
+2026-02-18 16:20:46,982 - INFO - Token ends: ...iknuc
+2026-02-18 16:22:49,846 - INFO - --- BOT HOT RELOAD ---
+2026-02-18 16:22:49,847 - INFO - Active Persona: Luna Goth
+2026-02-18 16:22:49,847 - INFO - Token ends: ...iknuc
+2026-02-18 16:23:01,228 - INFO - Closing old bot session for Hot Reload...
+2026-02-18 16:23:01,690 - INFO - --- BOT HOT RELOAD ---
+2026-02-18 16:23:01,690 - INFO - Active Persona: Default
+2026-02-18 16:23:01,691 - INFO - Token ends: ...d-JJ4
+2026-02-18 16:23:38,954 - INFO - Closing old bot session for Hot Reload...
+2026-02-18 16:23:39,384 - INFO - --- BOT HOT RELOAD ---
+2026-02-18 16:23:39,385 - INFO - Active Persona: Luna Goth
+2026-02-18 16:23:39,385 - INFO - Token ends: ...iknuc
+2026-02-18 16:23:43,519 - INFO - Closing old bot session for Hot Reload...
+2026-02-18 16:23:43,942 - INFO - --- BOT HOT RELOAD ---
+2026-02-18 16:23:43,943 - INFO - Active Persona: Skye Carter
+2026-02-18 16:23:43,944 - INFO - Token ends: ...d-JJ4
+2026-02-18 16:23:46,329 - INFO - Closing old bot session for Hot Reload...
+2026-02-18 16:23:46,723 - INFO - --- BOT HOT RELOAD ---
+2026-02-18 16:23:46,724 - INFO - Active Persona: Luna Goth
+2026-02-18 16:23:46,725 - INFO - Token ends: ...iknuc
+2026-02-18 16:24:08,483 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-18 16:24:12,826 - INFO - Update id=512875277 is handled. Duration 9594 ms by bot id=8440701862
+2026-02-18 16:24:48,514 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-18 16:24:50,963 - INFO - Update id=512875278 is handled. Duration 4693 ms by bot id=8440701862
+2026-02-18 16:25:18,452 - INFO - Closing old bot session for Hot Reload...
+2026-02-18 16:25:18,895 - INFO - --- BOT HOT RELOAD ---
+2026-02-18 16:25:18,897 - INFO - Active Persona: Default
+2026-02-18 16:25:18,899 - INFO - Token ends: ...d-JJ4
+2026-02-18 16:25:32,634 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-18 16:25:32,986 - INFO - Update id=512875279 is handled. Duration 3759 ms by bot id=7756198924
+2026-02-18 16:31:26,671 - INFO - --- BOT HOT RELOAD: OFFLINE ---
+2026-02-18 16:36:29,630 - INFO - --- BOT HOT RELOAD: OFFLINE ---
+2026-02-18 16:36:59,549 - INFO - Update id=512875280 is handled. Duration 214 ms by bot id=7756198924

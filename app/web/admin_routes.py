@@ -18,7 +18,65 @@ def auth(credentials: HTTPBasicCredentials = Depends(security)):
         raise HTTPException(status_code=401, headers={"WWW-Authenticate": "Basic"})
     return credentials.username
 
-# [Zostawiasz trasy: dashboard, chat_viewer, personas_list, delete_persona, update_persona]
+@router.get("/", response_class=HTMLResponse)
+@router.get("/users", response_class=HTMLResponse)
+async def dashboard(request: Request, db: AsyncSession = Depends(get_db), user=Depends(auth)):
+    users = (await db.execute(select(User).order_by(desc(User.created_at)))).scalars().all()
+    vip_users = len([u for u in users if u.is_vip])
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request, "total_users": len(users), "vip_users": vip_users, "recent_users": users, "username": user
+    })
+
+@router.get("/chat/{user_id}", response_class=HTMLResponse)
+async def chat_viewer(request: Request, user_id: int, db: AsyncSession = Depends(get_db), user=Depends(auth)):
+    chat_user = await db.get(User, user_id)
+    msgs = (await db.execute(select(Message).where(Message.user_id == user_id).order_by(Message.timestamp))).scalars().all()
+    return templates.TemplateResponse("chat_viewer.html", {"request": request, "chat_user": chat_user, "messages": msgs, "username": user})
+
+@router.get("/personas", response_class=HTMLResponse)
+async def personas_list(request: Request, db: AsyncSession = Depends(get_db), user=Depends(auth)):
+    result = await db.execute(select(Persona).order_by(Persona.id))
+    personas = result.scalars().all()
+    msg_count = await db.scalar(select(func.count(Message.id)))
+    for p in personas:
+        p.stats_msgs = msg_count if p.is_active else 0
+        p.stats_cost = round(p.stats_msgs * 0.002, 2)
+    return templates.TemplateResponse("personas.html", {"request": request, "personas": personas, "username": user})
+
+@router.post("/personas/create")
+async def create_persona(name: str = Form(...), system_prompt: str = Form(...), telegram_token: str = Form(None), ai_model: str = Form("openrouter/free"), db: AsyncSession = Depends(get_db), user=Depends(auth)):
+    token = telegram_token if telegram_token and telegram_token.strip() else None
+    db.add(Persona(name=name, system_prompt=system_prompt, telegram_token=token, ai_model=ai_model, is_active=False))
+    await db.commit()
+    return RedirectResponse(url="/admin/personas", status_code=303)
+
+@router.get("/personas/{persona_id}", response_class=HTMLResponse)
+async def edit_persona_page(request: Request, persona_id: int, db: AsyncSession = Depends(get_db), user=Depends(auth)):
+    persona = await db.get(Persona, persona_id)
+    if not persona: raise HTTPException(status_code=404)
+    return templates.TemplateResponse("edit_persona.html", {"request": request, "persona": persona, "username": user})
+
+@router.post("/personas/{persona_id}/update")
+async def update_persona(persona_id: int, name: str = Form(...), system_prompt: str = Form(...), telegram_token: str = Form(None), ai_model: str = Form(...), db: AsyncSession = Depends(get_db), user=Depends(auth)):
+    persona = await db.get(Persona, persona_id)
+    if persona:
+        persona.name = name
+        persona.system_prompt = system_prompt
+        persona.ai_model = ai_model
+        persona.telegram_token = telegram_token if telegram_token and telegram_token.strip() else None
+        await db.commit()
+    return RedirectResponse(url="/admin/personas", status_code=303)
+
+@router.post("/personas/{persona_id}/activate")
+async def activate_persona(persona_id: int, db: AsyncSession = Depends(get_db), user=Depends(auth)):
+    await db.execute(update(Persona).values(is_active=False))
+    await db.execute(update(Persona).where(Persona.id == persona_id).values(is_active=True))
+    await db.commit()
+    
+    from app.main import init_bot
+    await init_bot()
+    
+    return RedirectResponse(url="/admin/personas", status_code=303)
 
 @router.post("/personas/{persona_id}/deactivate")
 async def deactivate_persona(persona_id: int, db: AsyncSession = Depends(get_db), user=Depends(auth)):
@@ -26,23 +84,14 @@ async def deactivate_persona(persona_id: int, db: AsyncSession = Depends(get_db)
     if persona:
         persona.is_active = False
         await db.commit()
-        
-        # --- HOT RELOAD ---
         from app.main import init_bot
         await init_bot()
-        
     return RedirectResponse(url="/admin/personas", status_code=303)
 
-@router.post("/personas/{persona_id}/activate")
-async def activate_persona(persona_id: int, db: AsyncSession = Depends(get_db), user=Depends(auth)):
-    # Wyłączamy wszystkie, aktywujemy wybraną
-    await db.execute(update(Persona).values(is_active=False))
-    await db.execute(update(Persona).where(Persona.id == persona_id).values(is_active=True))
-    await db.commit()
-    
-    # --- HOT RELOAD (KLUCZ) ---
-    # Po zmianie w bazie, natychmiast odświeżamy obiekt Bot w pamięci
-    from app.main import init_bot
-    await init_bot()
-    
+@router.post("/personas/{persona_id}/delete")
+async def delete_persona(persona_id: int, db: AsyncSession = Depends(get_db), user=Depends(auth)):
+    persona = await db.get(Persona, persona_id)
+    if persona and not persona.is_active:
+        await db.delete(persona)
+        await db.commit()
     return RedirectResponse(url="/admin/personas", status_code=303)
