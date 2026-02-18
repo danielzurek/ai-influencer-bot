@@ -48,6 +48,20 @@ async def personas_list(request: Request, db: AsyncSession = Depends(get_db), us
         p.stats_cost = round(p.stats_msgs * 0.002, 2) # Szacunkowy koszt 0.002$ za wiadomość
         
     return templates.TemplateResponse("personas.html", {"request": request, "personas": personas, "username": user})
+# --- USUWANIE MODELKI ---
+@router.post("/personas/{persona_id}/delete")
+async def delete_persona(persona_id: int, db: AsyncSession = Depends(get_db), user=Depends(auth)):
+    persona = await db.get(Persona, persona_id)
+    if not persona:
+        raise HTTPException(status_code=404, detail="Persona not found")
+    
+    # Zabezpieczenie przed usunięciem aktywnej modelki
+    if persona.is_active:
+        return RedirectResponse(url="/admin/personas?error=active", status_code=303)
+        
+    await db.delete(persona)
+    await db.commit()
+    return RedirectResponse(url="/admin/personas", status_code=303)
 
 @router.post("/personas/create")
 async def create_persona(
