@@ -108,3 +108,17 @@ class BroadcastLog(Base):
     
     broadcast: Mapped["Broadcast"] = relationship("Broadcast", back_populates="logs")
     user: Mapped["User"] = relationship("User", back_populates="broadcast_logs")
+    
+    # ... (reszta Twoich modeli) ...
+
+class CustomRequest(Base):
+    __tablename__ = "custom_requests"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.telegram_id"))
+    description: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="pending") 
+    file_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    media_type: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    price: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    user: Mapped["User"] = relationship("User")

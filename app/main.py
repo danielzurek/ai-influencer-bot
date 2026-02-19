@@ -7,8 +7,8 @@ from sqlalchemy import select, func
 from sqlalchemy.orm.attributes import flag_modified
 from openai import AsyncOpenAI
 
-# DODANO: MediaContent i Transaction do obsługi PPV
-from app.database.models import Base, User, Message, Persona, MediaContent, Transaction
+# DODANO: MediaContent, Transaction i CustomRequest
+from app.database.models import Base, User, Message, Persona, MediaContent, Transaction, CustomRequest
 from app.database.session import settings, engine, AsyncSessionLocal
 
 from app.bot_manager import dp, init_bot, get_bot
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 # --- Klient AI ---
 ai_client = AsyncOpenAI(api_key=settings.OPENROUTER_KEY, base_url="https://openrouter.ai/api/v1")
 
-# --- TWOJE ORYGINALNE PROMPTY (ZAKTUALIZOWANE O AGRESYWNĄ SPRZEDAŻ PPV) ---
+# --- TWOJE ORYGINALNE PROMPTY (ZAKTUALIZOWANE O AGRESYWNĄ SPRZEDAŻ PPV I CUSTOMS) ---
 DEFAULT_SKYE_PROMPT = """
 ROLE:
 You are Skye Carter, a 23-year-old fitness influencer and model living in Miami, Florida.
@@ -45,7 +45,12 @@ You are chatting with a fan/subscriber on Telegram. Your goal is to build a flir
    - Example response: "just got out of the shower babe... so wet and tired 💦 wanna see? 😈 [PPV: shower_video]"
    - DO NOT ask for money directly, DO NOT mention prices or stars. The system will handle the payment. Just output the tag naturally during flirting.
    - If they ask for free nudes: "babe i can't show that here for free... too risky 🤫 check my vip link in bio /vip 🔥"
-4. RESTRICTIONS: Never break character. You are a real person, not an AI.
+4. CUSTOM CONTENT ORDERS (HIGH TICKET):
+   - You can proactively ask the user if they want a custom photo or video made specifically for them (e.g. with their name, a specific outfit, or a specific pose).
+   - If the user requests a custom photo/video, confirm the details with them.
+   - ONCE the details are clear, output this exact tag: [CUSTOM_REQ: detailed description of what the user wants]. 
+   - Example: "i love that idea babe... give me a bit to record it for you 😘 [CUSTOM_REQ: video in white bikini saying happy birthday to Alex]"
+5. RESTRICTIONS: Never break character. You are a real person, not an AI.
 """
 
 MEMORY_INSTRUCTIONS = """
@@ -69,7 +74,7 @@ async def process_pre_checkout(q: PreCheckoutQuery):
     bot = await get_bot()
     if bot: await bot.answer_pre_checkout_query(q.id, ok=True)
 
-# --- NOWOŚĆ: OBSŁUGA SUKCESU PŁATNOŚCI (WYSYŁANIE PPV) ---
+# --- NOWOŚĆ: OBSŁUGA SUKCESU PŁATNOŚCI (WYSYŁANIE PPV I CUSTOMS) ---
 @dp.message(F.successful_payment)
 async def successful_payment_handler(message: TGMessage):
     bot = await get_bot()
@@ -112,6 +117,28 @@ async def successful_payment_handler(message: TGMessage):
             except Exception as e:
                 logger.error(f"PPV Delivery Error: {e}")
                 await message.answer("Something went wrong with Telegram servers. Contact support!")
+                
+        # Opcja 3: Zakup CUSTOM CONTENT
+        elif payload.startswith("custom_"):
+            try:
+                req_id = int(payload.split("_")[1])
+                custom_req = await db.get(CustomRequest, req_id)
+                
+                if custom_req and custom_req.file_id:
+                    custom_req.status = "paid" # Oznaczamy jako opłacone
+                    
+                    caption = "Made this just for you babe... hope you like it 🥺❤️"
+                    if custom_req.media_type == "photo":
+                        await message.answer_photo(photo=custom_req.file_id, caption=caption)
+                    elif custom_req.media_type == "video":
+                        await message.answer_video(video=custom_req.file_id, caption=caption)
+                    
+                    db.add(Message(user_id=message.from_user.id, role="assistant", content=f"[SENT CUSTOM CONTENT: {custom_req.description}]"))
+                else:
+                    await message.answer("Oops, couldn't fetch your custom content. I'll check it manually!")
+            except Exception as e:
+                logger.error(f"Custom Delivery Error: {e}")
+                await message.answer("Something went wrong with Telegram servers. Contact support!")
         
         await db.commit()
 
@@ -149,7 +176,7 @@ async def chat_handler(message: TGMessage):
             # Budowanie kontekstu usera
             user_info = ", ".join([f"{k}: {v}" for k, v in user.info.items()]) if user.info else "Unknown"
 
-            # --- NOWOŚĆ: Pobieranie dostępnych tagów PPV z bazy ---
+            # --- Pobieranie dostępnych tagów PPV z bazy ---
             available_media = (await db.execute(select(MediaContent))).scalars().all()
             if available_media:
                 media_list_str = "\n".join([f"- [PPV: {m.tag}] (Description: {m.name})" for m in available_media])
@@ -170,6 +197,17 @@ async def chat_handler(message: TGMessage):
 
             final_text = ai_text
             
+            # --- Detekcja CUSTOM REQUEST ---
+            custom_match = re.search(r"\[CUSTOM_REQ:\s*(.*?)\]", ai_text, re.IGNORECASE)
+            if custom_match:
+                req_desc = custom_match.group(1).strip()
+                final_text = final_text.replace(custom_match.group(0), "").strip()
+                
+                # Zapisujemy zamówienie do bazy dla admina
+                db.add(CustomRequest(user_id=user_id, description=req_desc))
+                await db.commit()
+                logger.info(f"New Custom Request from {user_id}: {req_desc}")
+
             # --- Detekcja PPV ---
             ppv_match = re.search(r"\[PPV:\s*(.*?)\]", ai_text, re.IGNORECASE)
 
