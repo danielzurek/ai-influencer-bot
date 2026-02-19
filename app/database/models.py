@@ -27,7 +27,6 @@ class User(Base):
     messages: Mapped[List["Message"]] = relationship("Message", back_populates="user")
     transactions: Mapped[List["Transaction"]] = relationship("Transaction", back_populates="user")
     groups: Mapped[List["Group"]] = relationship("Group", secondary=user_groups, back_populates="users")
-    # Nowa relacja do logów broadcastu
     broadcast_logs: Mapped[List["BroadcastLog"]] = relationship("BroadcastLog", back_populates="user")
 
 class Group(Base):
@@ -64,18 +63,33 @@ class Persona(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
-# --- NOWE TABELE: BROADCAST SYSTEM ---
+# --- NOWOŚĆ: PPV CONTENT ---
+class MediaContent(Base):
+    __tablename__ = "media_content"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    tag: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(100))
+    file_id: Mapped[str] = mapped_column(String(255))
+    media_type: Mapped[str] = mapped_column(String(20)) # "photo" lub "video"
+    price: Mapped[int] = mapped_column(Integer) # Cena w Starsach (XTR)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
+# --- BROADCAST SYSTEM ---
 class Broadcast(Base):
     __tablename__ = "broadcasts"
     
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     message_content: Mapped[str] = mapped_column(Text)
     target_type: Mapped[str] = mapped_column(String(50)) # 'all' or 'groups'
+    
+    # DODANO: Powiązanie z materiałem PPV, jeśli wybrano z listy
+    media_id: Mapped[Optional[int]] = mapped_column(ForeignKey("media_content.id"), nullable=True)
+    media: Mapped[Optional["MediaContent"]] = relationship("MediaContent")
+    
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     status: Mapped[str] = mapped_column(String(20), default="processing") # processing, completed
     
-    # Statystyki (dla szybkiego podglądu)
+    # Statystyki
     total_recipients: Mapped[int] = mapped_column(Integer, default=0)
     success_count: Mapped[int] = mapped_column(Integer, default=0)
     fail_count: Mapped[int] = mapped_column(Integer, default=0)

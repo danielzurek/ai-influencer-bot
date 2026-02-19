@@ -28,13 +28,26 @@
                         </div>
                     </div>
 
+                    <div class="mb-4 border border-warning rounded p-3 bg-dark">
+                        <label class="form-label fw-bold text-uppercase text-warning">💰 Attach PPV Content (Optional)</label>
+                        <select name="media_id" class="form-select bg-dark text-light border-secondary">
+                            <option value="">-- No PPV (Text Message Only) --</option>
+                            {% for item in media_items %}
+                            <option value="{{ item.id }}">🔥 {{ item.name }} (Price: ⭐ {{ item.price }} Stars)</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text text-light mt-2">
+                            If selected, the bot will send the text message below, followed immediately by an invoice button to unlock this content.
+                        </div>
+                    </div>
+
                     <div class="mb-4">
-                        <label class="form-label fw-bold text-uppercase text-muted">2. Message</label>
-                        <textarea name="message_text" class="form-control font-monospace" rows="5" placeholder="Hey babe! Check out my new photos..." required></textarea>
+                        <label class="form-label fw-bold text-uppercase text-muted">2. Message Text</label>
+                        <textarea name="message_text" class="form-control font-monospace" rows="5" placeholder="Hey babe! I made something special for you tonight... check it out below 👇" required></textarea>
                     </div>
 
                     <div class="d-grid">
-                        <button type="submit" class="btn btn-primary fw-bold" onclick="return confirm('Send this message?')">🚀 Launch Broadcast</button>
+                        <button type="submit" class="btn btn-primary fw-bold btn-lg" onclick="return confirm('Send this campaign to the selected audience?')">🚀 Launch Broadcast</button>
                     </div>
                 </form>
             </div>
@@ -49,9 +62,9 @@
                     <thead>
                         <tr>
                             <th class="ps-3">Date</th>
+                            <th>Info</th>
                             <th>Stats</th>
-                            <th>Status</th>
-                            <th></th>
+                            <th class="text-end pe-3">Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -62,11 +75,18 @@
                                 <strong>{{ b.created_at.strftime('%H:%M') }}</strong>
                             </td>
                             <td>
-                                <span class="text-success">{{ b.success_count }}</span> / <span class="text-muted">{{ b.total_recipients }}</span>
+                                {% if b.media %}
+                                <span class="badge bg-warning text-dark px-2">💰 PPV attached</span><br>
+                                <small class="text-muted">{{ b.media.name }}</small>
+                                {% else %}
+                                <span class="badge bg-secondary px-2">📝 Text Only</span>
+                                {% endif %}
                             </td>
                             <td>
+                                <span class="text-success">{{ b.success_count }}</span> / <span class="text-muted">{{ b.total_recipients }}</span>
+                                <br>
                                 {% if b.status == 'processing' %}
-                                <span class="badge bg-warning text-dark">Sending...</span>
+                                <span class="badge bg-info text-dark">Sending...</span>
                                 {% else %}
                                 <span class="badge bg-secondary">Done</span>
                                 {% endif %}
@@ -86,6 +106,7 @@
 </div>
 
 <script>
+    // Skrypt do pokazywania/ukrywania listy grup
     function toggleGroups(show) {
         document.getElementById('groupSelection').style.display = show ? 'block' : 'none';
     }

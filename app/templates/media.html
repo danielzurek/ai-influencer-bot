@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4 mb-4">
+        <div class="card shadow-sm border-warning">
+            <div class="card-header bg-warning text-dark fw-bold">Create PPV Content</div>
+            <div class="card-body">
+                <form action="/admin/media/create" method="post">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-uppercase">Tag (for AI)</label>
+                        <input type="text" name="tag" class="form-control font-monospace" placeholder="beach_nude" required>
+                        <div class="form-text">AI will trigger this with <code>[PPV: tag]</code></div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-uppercase">Display Name</label>
+                        <input type="text" name="name" class="form-control" placeholder="Secret Beach Photo 🤫" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-uppercase">File ID</label>
+                        <input type="text" name="file_id" class="form-control font-monospace" placeholder="AgAC..." required>
+                        <div class="form-text">Send media to @RawDataBot to get File ID.</div>
+                    </div>
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label small fw-bold text-uppercase">Type</label>
+                            <select name="media_type" class="form-select">
+                                <option value="photo">Photo</option>
+                                <option value="video">Video</option>
+                            </select>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label small fw-bold text-uppercase">Price (Stars)</label>
+                            <input type="number" name="price" class="form-control" value="50" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-warning w-100 fw-bold">Add Content</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-header">Active PPV Media</div>
+            <div class="card-body p-0">
+                <table class="table table-dark table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-3">Content Info</th>
+                            <th>Tag</th>
+                            <th>Price</th>
+                            <th class="text-end pe-3">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in media_items %}
+                        <tr>
+                            <td class="ps-3">
+                                <span class="fw-bold">{{ item.name }}</span><br>
+                                <small class="text-muted">{{ item.media_type.upper() }} • ID: {{ item.file_id[:10] }}...</small>
+                            </td>
+                            <td><code class="text-warning">[PPV: {{ item.tag }}]</code></td>
+                            <td>⭐ {{ item.price }}</td>
+                            <td class="text-end pe-3">
+                                <form action="/admin/media/{{ item.id }}/delete" method="post" onsubmit="return confirm('Delete?');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Del</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="text-center py-4 text-muted">No PPV content added yet.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
