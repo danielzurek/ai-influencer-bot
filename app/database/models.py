@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncAttrs
 class Base(AsyncAttrs, DeclarativeBase):
     pass
 
-# --- TABELA ŁĄCZĄCA (Many-to-Many) ---
 user_groups = Table(
     "user_groups",
     Base.metadata,
@@ -42,6 +41,12 @@ class Message(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.telegram_id"), index=True)
     role: Mapped[str] = mapped_column(String(20))
     content: Mapped[str] = mapped_column(Text)
+    
+    # --- NOWOŚĆ: TRACKOWANIE KOSZTÓW AI ---
+    ai_cost: Mapped[Optional[float]] = mapped_column(Float, default=0.0)
+    prompt_tokens: Mapped[Optional[int]] = mapped_column(Integer, default=0)
+    completion_tokens: Mapped[Optional[int]] = mapped_column(Integer, default=0)
+    
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     user: Mapped["User"] = relationship("User", back_populates="messages")
 
@@ -64,53 +69,41 @@ class Persona(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
-# --- NOWOŚĆ: PPV CONTENT ---
 class MediaContent(Base):
     __tablename__ = "media_content"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     tag: Mapped[str] = mapped_column(String(50), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(100))
     file_id: Mapped[str] = mapped_column(String(255))
-    media_type: Mapped[str] = mapped_column(String(20)) # "photo" lub "video"
-    price: Mapped[int] = mapped_column(Integer) # Cena w Starsach (XTR)
+    media_type: Mapped[str] = mapped_column(String(20)) 
+    price: Mapped[int] = mapped_column(Integer) 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
-# --- BROADCAST SYSTEM ---
 class Broadcast(Base):
     __tablename__ = "broadcasts"
-    
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     message_content: Mapped[str] = mapped_column(Text)
-    target_type: Mapped[str] = mapped_column(String(50)) # 'all' or 'groups'
-    
-    # DODANO: Powiązanie z materiałem PPV, jeśli wybrano z listy
+    target_type: Mapped[str] = mapped_column(String(50)) 
     media_id: Mapped[Optional[int]] = mapped_column(ForeignKey("media_content.id"), nullable=True)
     media: Mapped[Optional["MediaContent"]] = relationship("MediaContent")
-    
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
-    status: Mapped[str] = mapped_column(String(20), default="processing") # processing, completed
-    
-    # Statystyki
+    status: Mapped[str] = mapped_column(String(20), default="processing") 
     total_recipients: Mapped[int] = mapped_column(Integer, default=0)
     success_count: Mapped[int] = mapped_column(Integer, default=0)
     fail_count: Mapped[int] = mapped_column(Integer, default=0)
-    
     logs: Mapped[List["BroadcastLog"]] = relationship("BroadcastLog", back_populates="broadcast", cascade="all, delete-orphan")
 
 class BroadcastLog(Base):
     __tablename__ = "broadcast_logs"
-    
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     broadcast_id: Mapped[int] = mapped_column(ForeignKey("broadcasts.id"))
     user_id: Mapped[int] = mapped_column(ForeignKey("users.telegram_id"))
-    status: Mapped[str] = mapped_column(String(20)) # 'sent', 'failed'
+    status: Mapped[str] = mapped_column(String(20)) 
     error_message: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
-    
     broadcast: Mapped["Broadcast"] = relationship("Broadcast", back_populates="logs")
     user: Mapped["User"] = relationship("User", back_populates="broadcast_logs")
     
-
 class CustomRequest(Base):
     __tablename__ = "custom_requests"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)

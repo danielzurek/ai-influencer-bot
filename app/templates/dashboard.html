@@ -2,33 +2,64 @@
 
 {% block content %}
 <div class="row mb-4">
-    <div class="col-md-4"><div class="card p-3"><h3>{{ total_users }}</h3><small class="text-secondary">Total Users</small></div></div>
-    <div class="col-md-4"><div class="card p-3"><h3>{{ vip_users }}</h3><small class="text-warning">VIP Subscribers</small></div></div>
-    <div class="col-md-4"><div class="card p-3"><h3>$0.00</h3><small class="text-success">Monthly Revenue (Demo)</small></div></div>
+    <div class="col-md-3">
+        <div class="card p-3 shadow-sm">
+            <h3>{{ total_users }}</h3>
+            <small class="text-secondary text-uppercase fw-bold">Total Users</small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card p-3 shadow-sm">
+            <h3>{{ vip_users }}</h3>
+            <small class="text-warning text-uppercase fw-bold">VIP Subscribers</small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card p-3 shadow-sm border-danger">
+            <h3 class="text-danger">${{ total_ai_cost }}</h3>
+            <small class="text-secondary text-uppercase fw-bold">Total AI Cost</small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card p-3 shadow-sm border-success">
+            <h3 class="text-success">⭐ {{ total_revenue }}</h3>
+            <small class="text-secondary text-uppercase fw-bold">Total Revenue (XTR)</small>
+        </div>
+    </div>
 </div>
 
-<div class="card shadow-sm">
-    <div class="card-header fw-bold">Recent User Interactions</div>
+<div class="card shadow-sm border-secondary">
+    <div class="card-header fw-bold bg-dark">Recent User Interactions</div>
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table table-dark table-hover align-middle mb-0">
                 <thead>
-                    <tr><th>Telegram ID</th><th>Name</th><th>VIP Status</th><th>Joined</th><th class="text-end">Action</th></tr>
+                    <tr>
+                        <th class="ps-3">Telegram ID</th>
+                        <th>Name</th>
+                        <th>Status</th>
+                        <th>AI Cost</th>
+                        <th>Joined</th>
+                        <th class="text-end pe-3">Action</th>
+                    </tr>
                 </thead>
                 <tbody>
                     {% for user in recent_users %}
                     <tr>
-                        <td><code>{{ user.telegram_id }}</code></td>
-                        <td>{{ user.username or "Anonymous" }}</td>
+                        <td class="ps-3"><code>{{ user.telegram_id }}</code></td>
+                        <td class="fw-bold">{{ user.username or "Anonymous" }}</td>
                         <td>
                             {% if user.is_vip %}
-                            <span class="badge bg-warning text-dark">VIP subscriber</span>
+                            <span class="badge bg-warning text-dark shadow-sm">VIP subscriber</span>
                             {% else %}
                             <span class="badge bg-secondary">Free Tier</span>
                             {% endif %}
                         </td>
-                        <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
-                        <td class="text-end"><a href="/admin/chat/{{ user.telegram_id }}" class="btn btn-sm btn-outline-info">View Chat</a></td>
+                        <td class="text-danger fw-bold">${{ user.total_cost }}</td>
+                        <td class="text-muted"><small>{{ user.created_at.strftime('%Y-%m-%d %H:%M') }}</small></td>
+                        <td class="text-end pe-3">
+                            <a href="/admin/chat/{{ user.telegram_id }}" class="btn btn-sm btn-outline-info">View Chat</a>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
