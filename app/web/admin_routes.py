@@ -112,9 +112,10 @@ async def personas_list(request: Request, db: AsyncSession = Depends(get_db), us
     return templates.TemplateResponse("personas.html", {"request": request, "personas": personas, "username": user})
 
 @router.post("/personas/create")
-async def create_persona(name: str = Form(...), system_prompt: str = Form(...), telegram_token: str = Form(None), ai_model: str = Form("openrouter/free"), db: AsyncSession = Depends(get_db), user=Depends(auth)):
-    token = telegram_token.strip() if telegram_token and telegram_token.strip() else None
-    db.add(Persona(name=name, system_prompt=system_prompt, telegram_token=token, ai_model=ai_model, is_active=False))
+async def create_persona(name: str = Form(...), system_prompt: str = Form(...), telegram_token: str = Form(None), openrouter_token: str = Form(None), ai_model: str = Form("openrouter/free"), db: AsyncSession = Depends(get_db), user=Depends(auth)):
+    t_token = telegram_token.strip() if telegram_token and telegram_token.strip() else None
+    o_token = openrouter_token.strip() if openrouter_token and openrouter_token.strip() else None
+    db.add(Persona(name=name, system_prompt=system_prompt, telegram_token=t_token, openrouter_token=o_token, ai_model=ai_model, is_active=False))
     await db.commit()
     return RedirectResponse(url="/admin/personas", status_code=303)
 
@@ -125,11 +126,12 @@ async def edit_persona_page(request: Request, persona_id: int, db: AsyncSession 
     return templates.TemplateResponse("edit_persona.html", {"request": request, "persona": persona, "username": user})
 
 @router.post("/personas/{persona_id}/update")
-async def update_persona(persona_id: int, name: str = Form(...), system_prompt: str = Form(...), telegram_token: str = Form(None), ai_model: str = Form(...), db: AsyncSession = Depends(get_db), user=Depends(auth)):
+async def update_persona(persona_id: int, name: str = Form(...), system_prompt: str = Form(...), telegram_token: str = Form(None), openrouter_token: str = Form(None), ai_model: str = Form(...), db: AsyncSession = Depends(get_db), user=Depends(auth)):
     persona = await db.get(Persona, persona_id)
     if persona:
         persona.name = name; persona.system_prompt = system_prompt; persona.ai_model = ai_model
         persona.telegram_token = telegram_token.strip() if telegram_token and telegram_token.strip() else None
+        persona.openrouter_token = openrouter_token.strip() if openrouter_token and openrouter_token.strip() else None
         await db.commit()
         if persona.is_active: await init_bot()
     return RedirectResponse(url="/admin/personas", status_code=303)
@@ -158,7 +160,6 @@ async def delete_persona(persona_id: int, db: AsyncSession = Depends(get_db), us
         await db.delete(persona)
         await db.commit()
     return RedirectResponse(url="/admin/personas", status_code=303)
-
 
 # --- BROADCAST SYSTEM ---
 @router.get("/broadcast", response_class=HTMLResponse)
@@ -234,7 +235,6 @@ async def send_broadcast(
         logger.error(f"Error starting broadcast: {e}", exc_info=True)
         return HTMLResponse(f"<h1>Crash!</h1><p>Database Error: {e}</p>", status_code=500)
 
-
 # --- PPV CONTENT MANAGEMENT ---
 @router.get("/media", response_class=HTMLResponse)
 async def media_list(request: Request, db: AsyncSession = Depends(get_db), user=Depends(auth)):
@@ -255,11 +255,9 @@ async def delete_media(media_id: int, db: AsyncSession = Depends(get_db), user=D
         await db.delete(item); await db.commit()
     return RedirectResponse(url="/admin/media", status_code=303)
 
-
 # --- CUSTOM ORDERS MANAGEMENT ---
 @router.get("/customs", response_class=HTMLResponse)
 async def customs_list(request: Request, db: AsyncSession = Depends(get_db), user=Depends(auth)):
-    # TO JEST NAPRAWIONA LINIJKA (użycie poprawnej funkcji 'case')
     orders = (await db.execute(
         select(CustomRequest).options(selectinload(CustomRequest.user))
         .order_by(case((CustomRequest.status == 'pending', 1), else_=2), desc(CustomRequest.created_at))

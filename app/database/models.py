@@ -59,6 +59,7 @@ class Persona(Base):
     name: Mapped[str] = mapped_column(String(100))
     system_prompt: Mapped[str] = mapped_column(Text)
     telegram_token: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    openrouter_token: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     ai_model: Mapped[str] = mapped_column(String(100), default="openrouter/free")
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
@@ -109,7 +110,6 @@ class BroadcastLog(Base):
     broadcast: Mapped["Broadcast"] = relationship("Broadcast", back_populates="logs")
     user: Mapped["User"] = relationship("User", back_populates="broadcast_logs")
     
-    # ... (reszta Twoich modeli) ...
 
 class CustomRequest(Base):
     __tablename__ = "custom_requests"

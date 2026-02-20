@@ -25,6 +25,11 @@
                         <label class="form-label small text-uppercase fw-bold">Telegram Bot Token (Optional)</label>
                         <input type="text" name="telegram_token" class="form-control bg-dark text-light border-secondary" value="{{ persona.telegram_token or '' }}" placeholder="Using .env default if empty">
                     </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label small text-uppercase fw-bold">OpenRouter API Key (Optional)</label>
+                        <input type="text" name="openrouter_token" class="form-control bg-dark text-light border-secondary" value="{{ persona.openrouter_token or '' }}" placeholder="Using .env default if empty">
+                    </div>
 
                     <div class="mb-3">
                         <label class="form-label small text-uppercase fw-bold">System Prompt</label>

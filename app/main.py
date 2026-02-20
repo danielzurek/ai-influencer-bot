@@ -7,7 +7,6 @@ from sqlalchemy import select, func
 from sqlalchemy.orm.attributes import flag_modified
 from openai import AsyncOpenAI
 
-# DODANO: MediaContent, Transaction i CustomRequest
 from app.database.models import Base, User, Message, Persona, MediaContent, Transaction, CustomRequest
 from app.database.session import settings, engine, AsyncSessionLocal
 
@@ -17,9 +16,6 @@ from app.bot_manager import dp, init_bot, get_bot
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s',
                     handlers=[logging.StreamHandler(sys.stdout), logging.FileHandler("app_main.log")])
 logger = logging.getLogger(__name__)
-
-# --- Klient AI ---
-ai_client = AsyncOpenAI(api_key=settings.OPENROUTER_KEY, base_url="https://openrouter.ai/api/v1")
 
 # --- TWOJE ORYGINALNE PROMPTY (ZAKTUALIZOWANE O AGRESYWNĄ SPRZEDAŻ PPV I CUSTOMS) ---
 DEFAULT_SKYE_PROMPT = """
@@ -192,7 +188,12 @@ async def chat_handler(message: TGMessage):
             for msg in reversed(history.scalars().all()): ai_messages.append({"role": msg.role, "content": msg.content})
 
             await bot.send_chat_action(chat_id=user_id, action="typing")
-            res = await ai_client.chat.completions.create(model=current_model, messages=ai_messages)
+            
+            # --- DYNAMICZNY KLIENT AI DLA TEJ PERSONY ---
+            or_token = active_persona.openrouter_token if active_persona.openrouter_token else settings.OPENROUTER_KEY
+            local_ai_client = AsyncOpenAI(api_key=or_token, base_url="https://openrouter.ai/api/v1")
+
+            res = await local_ai_client.chat.completions.create(model=current_model, messages=ai_messages)
             ai_text = res.choices[0].message.content or ""
 
             final_text = ai_text
