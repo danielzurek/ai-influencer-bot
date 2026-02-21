@@ -14,6 +14,14 @@ user_groups = Table(
     Column("group_id", ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True),
 )
 
+# --- NOWOŚĆ: Tabela łącząca Scenariusze z Grupami ---
+scenario_groups = Table(
+    "scenario_groups",
+    Base.metadata,
+    Column("scenario_id", ForeignKey("scenarios.id", ondelete="CASCADE"), primary_key=True),
+    Column("group_id", ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True),
+)
+
 class User(Base):
     __tablename__ = "users"
     telegram_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
@@ -41,12 +49,9 @@ class Message(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.telegram_id"), index=True)
     role: Mapped[str] = mapped_column(String(20))
     content: Mapped[str] = mapped_column(Text)
-    
-    # --- NOWOŚĆ: TRACKOWANIE KOSZTÓW AI ---
     ai_cost: Mapped[Optional[float]] = mapped_column(Float, default=0.0)
     prompt_tokens: Mapped[Optional[int]] = mapped_column(Integer, default=0)
     completion_tokens: Mapped[Optional[int]] = mapped_column(Integer, default=0)
-    
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     user: Mapped["User"] = relationship("User", back_populates="messages")
 
@@ -66,8 +71,26 @@ class Persona(Base):
     telegram_token: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     openrouter_token: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     ai_model: Mapped[str] = mapped_column(String(100), default="openrouter/free")
+    timezone: Mapped[str] = mapped_column(String(50), default="America/New_York")
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    scenarios: Mapped[List["Scenario"]] = relationship("Scenario", back_populates="persona", cascade="all, delete-orphan")
+
+class Scenario(Base):
+    __tablename__ = "scenarios"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    persona_id: Mapped[int] = mapped_column(ForeignKey("personas.id", ondelete="CASCADE"))
+    title: Mapped[str] = mapped_column(String(100))
+    prompt_addition: Mapped[str] = mapped_column(Text)
+    time_start: Mapped[str] = mapped_column(String(5)) 
+    time_end: Mapped[str] = mapped_column(String(5))   
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    
+    # --- NOWOŚĆ: Target Type i Relacja z Grupami ---
+    target_type: Mapped[str] = mapped_column(String(50), default="all") # 'all' or 'groups'
+    groups: Mapped[List["Group"]] = relationship("Group", secondary=scenario_groups)
+    
+    persona: Mapped["Persona"] = relationship("Persona", back_populates="scenarios")
 
 class MediaContent(Base):
     __tablename__ = "media_content"

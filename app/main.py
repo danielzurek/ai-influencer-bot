@@ -1,4 +1,6 @@
 import logging, sys, re
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from aiogram import types, F
@@ -6,10 +8,11 @@ from aiogram.types import LabeledPrice, PreCheckoutQuery, Message as TGMessage
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import flag_modified
 from openai import AsyncOpenAI
 
-from app.database.models import Base, User, Message, Persona, MediaContent, Transaction, CustomRequest
+from app.database.models import Base, User, Message, Persona, MediaContent, Transaction, CustomRequest, Scenario
 from app.database.session import settings, engine, AsyncSessionLocal
 
 from app.bot_manager import dp, init_bot, get_bot
@@ -113,7 +116,12 @@ async def chat_handler(message: TGMessage, state: FSMContext):
     if not message.text or message.successful_payment: return
     
     async with AsyncSessionLocal() as db:
-        active_persona = await db.scalar(select(Persona).where(Persona.is_active == True).limit(1))
+        # POBIERAMY MODELKĘ, SCENARIUSZE I ICH GRUPY
+        active_persona = await db.scalar(
+            select(Persona).options(
+                selectinload(Persona.scenarios).selectinload(Scenario.groups)
+            ).where(Persona.is_active == True).limit(1)
+        )
         if not active_persona or not bot: return
 
         user_id = message.from_user.id
@@ -122,7 +130,8 @@ async def chat_handler(message: TGMessage, state: FSMContext):
             current_prompt = active_persona.system_prompt
             current_model = active_persona.ai_model if active_persona.ai_model else settings.AI_MODEL
 
-            user = await db.get(User, user_id)
+            # POBIERAMY UŻYTKOWNIKA WRAZ Z JEGO GRUPAMI
+            user = await db.scalar(select(User).options(selectinload(User.groups)).where(User.telegram_id == user_id))
             if not user:
                 user = User(telegram_id=user_id, username=message.from_user.first_name, info={})
                 db.add(user); await db.commit()
@@ -143,7 +152,47 @@ async def chat_handler(message: TGMessage, state: FSMContext):
             else:
                 ppv_instructions = "\n\n--- AVAILABLE PPV CONTENT ---\nCurrently no PPV content available. Push for /vip instead."
 
-            system_msg = f"{current_prompt}{MEMORY_INSTRUCTIONS}{ppv_instructions}\n\nUSER PROFILE: {user_info}"
+            # --- TIME-BASED & GROUP-BASED SCENARIOS ---
+            scenario_instruction = ""
+            try:
+                tz_str = active_persona.timezone if active_persona.timezone else "America/New_York"
+                tz = ZoneInfo(tz_str)
+                local_time = datetime.now(tz)
+                current_time_str = local_time.strftime("%H:%M")
+                
+                active_scenario = None
+                for sc in active_persona.scenarios:
+                    if not sc.is_active: continue
+                    
+                    # 1. SPRAWDZANIE GRUPY
+                    if sc.target_type == "groups":
+                        user_group_ids = {g.id for g in user.groups}
+                        sc_group_ids = {g.id for g in sc.groups}
+                        # Jeśli użytkownik nie należy do żadnej wymaganej grupy, omiń scenariusz
+                        if not user_group_ids.intersection(sc_group_ids):
+                            continue
+                    
+                    # 2. SPRAWDZANIE CZASU
+                    start = sc.time_start
+                    end = sc.time_end
+                    
+                    if start <= end:
+                        if start <= current_time_str <= end:
+                            active_scenario = sc
+                            break
+                    else:
+                        if current_time_str >= start or current_time_str <= end:
+                            active_scenario = sc
+                            break
+                            
+                if active_scenario:
+                    scenario_instruction = f"\n\n--- CURRENT SCENARIO (LOCAL TIME {current_time_str}) ---\n{active_scenario.prompt_addition}"
+                    logger.info(f"Loaded scenario '{active_scenario.title}' for time {current_time_str}")
+            except Exception as e:
+                logger.error(f"Scenario time check error: {e}")
+            # ------------------------------------
+
+            system_msg = f"{current_prompt}{scenario_instruction}{MEMORY_INSTRUCTIONS}{ppv_instructions}\n\nUSER PROFILE: {user_info}"
             ai_messages = [{"role": "system", "content": system_msg}]
 
             history = await db.execute(select(Message).where(Message.user_id == user_id).order_by(Message.timestamp.desc()).limit(20))
@@ -154,21 +203,17 @@ async def chat_handler(message: TGMessage, state: FSMContext):
             or_token = active_persona.openrouter_token if active_persona.openrouter_token else settings.OPENROUTER_KEY
             local_ai_client = AsyncOpenAI(api_key=or_token, base_url="https://openrouter.ai/api/v1")
 
-            # --- ZAPYTANIE DO OPENROUTER Z WYMUSZENIEM ZWRÓCENIA KOSZTÓW ---
             res = await local_ai_client.chat.completions.create(
                 model=current_model, 
                 messages=ai_messages,
-                extra_body={"usage": {"include": True}} # Wymusza zwracanie kosztu w OpenRouter
+                extra_body={"usage": {"include": True}} 
             )
             ai_text = res.choices[0].message.content or ""
             final_text = ai_text
 
-            # --- WYCIĄGANIE KOSZTÓW Z ODPOWIEDZI ---
             p_tokens = res.usage.prompt_tokens if res.usage else 0
             c_tokens = res.usage.completion_tokens if res.usage else 0
             ai_cost = 0.0
-            
-            # Bezpieczne czytanie kosztu niezależnie od wersji SDK OpenAI/OpenRoutera
             try:
                 ai_cost = getattr(res, "cost", 0.0)
                 if not ai_cost and hasattr(res, 'model_extra') and res.model_extra:
@@ -176,10 +221,8 @@ async def chat_handler(message: TGMessage, state: FSMContext):
                 if not ai_cost and hasattr(res.usage, 'model_extra') and res.usage.model_extra:
                     ai_cost = res.usage.model_extra.get('cost', 0.0)
             except Exception: pass
-            
             cost_kwargs = {"ai_cost": ai_cost, "prompt_tokens": p_tokens, "completion_tokens": c_tokens}
 
-            # Detekcja CUSTOM REQUEST
             custom_match = re.search(r"\[CUSTOM_REQ:\s*(.*?)\]", ai_text, re.IGNORECASE)
             if custom_match:
                 req_desc = custom_match.group(1).strip()
@@ -187,10 +230,8 @@ async def chat_handler(message: TGMessage, state: FSMContext):
                 db.add(CustomRequest(user_id=user_id, description=req_desc))
                 await db.commit()
 
-            # Detekcja PPV
             ppv_match = re.search(r"\[PPV:\s*(.*?)\]", ai_text, re.IGNORECASE)
 
-            # Detekcja MEMORY
             matches = re.findall(r"\[MEM:\s*(.*?)=(.*?)\]", ai_text)
             if matches:
                 info = dict(user.info)
@@ -200,7 +241,6 @@ async def chat_handler(message: TGMessage, state: FSMContext):
                 user.info = info
                 flag_modified(user, "info"); await db.commit()
 
-            # Obsługa PPV (Wysyłanie faktury)
             if ppv_match:
                 tag = ppv_match.group(1).strip().lower()
                 final_text = final_text.replace(ppv_match.group(0), "").strip()
@@ -216,7 +256,6 @@ async def chat_handler(message: TGMessage, state: FSMContext):
                     await db.commit()
                     return
 
-            # Standardowe wysłanie wiadomości
             final_text = " ".join(final_text.split())
             if final_text:
                 db.add(Message(user_id=user_id, role="assistant", content=final_text, **cost_kwargs))

@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from aiogram.types import LabeledPrice
 
-from app.database.models import User, Message, Persona, Group, Broadcast, BroadcastLog, MediaContent, CustomRequest, Transaction
+from app.database.models import User, Message, Persona, Group, Broadcast, BroadcastLog, MediaContent, CustomRequest, Transaction, Scenario
 from app.database.session import get_db, settings, AsyncSessionLocal 
 from app.bot_manager import init_bot, get_bot
 
@@ -34,11 +34,9 @@ async def dashboard(request: Request, db: AsyncSession = Depends(get_db), user=D
     users = (await db.execute(select(User).order_by(desc(User.created_at)))).scalars().all()
     vip_users = len([u for u in users if u.is_vip])
     
-    # Rzeczywiste statystyki z bazy
     total_ai_cost = await db.scalar(select(func.sum(Message.ai_cost))) or 0.0
     total_revenue = await db.scalar(select(func.sum(Transaction.amount)).where(Transaction.status == "completed")) or 0.0
     
-    # Koszty per użytkownik
     costs = await db.execute(select(Message.user_id, func.sum(Message.ai_cost)).group_by(Message.user_id))
     cost_map = {row[0]: row[1] or 0.0 for row in costs.all()}
     
@@ -114,26 +112,51 @@ async def personas_list(request: Request, db: AsyncSession = Depends(get_db), us
     return templates.TemplateResponse("personas.html", {"request": request, "personas": personas, "username": user})
 
 @router.post("/personas/create")
-async def create_persona(name: str = Form(...), system_prompt: str = Form(...), telegram_token: str = Form(None), openrouter_token: str = Form(None), ai_model: str = Form("openrouter/free"), db: AsyncSession = Depends(get_db), user=Depends(auth)):
+async def create_persona(
+    name: str = Form(...), system_prompt: str = Form(...), 
+    telegram_token: str = Form(None), openrouter_token: str = Form(None), 
+    ai_model: str = Form("openrouter/free"), timezone: str = Form("America/New_York"),
+    db: AsyncSession = Depends(get_db), user=Depends(auth)
+):
     t_token = telegram_token.strip() if telegram_token and telegram_token.strip() else None
     o_token = openrouter_token.strip() if openrouter_token and openrouter_token.strip() else None
-    db.add(Persona(name=name, system_prompt=system_prompt, telegram_token=t_token, openrouter_token=o_token, ai_model=ai_model, is_active=False))
+    tz = timezone.strip() if timezone and timezone.strip() else "America/New_York"
+    
+    db.add(Persona(
+        name=name, system_prompt=system_prompt, telegram_token=t_token, 
+        openrouter_token=o_token, ai_model=ai_model, timezone=tz, is_active=False
+    ))
     await db.commit()
     return RedirectResponse(url="/admin/personas", status_code=303)
 
 @router.get("/personas/{persona_id}", response_class=HTMLResponse)
 async def edit_persona_page(request: Request, persona_id: int, db: AsyncSession = Depends(get_db), user=Depends(auth)):
-    persona = await db.get(Persona, persona_id)
+    # ZAKTUALIZOWANO: Dodano ładowanie Scenariuszy i ich Grup
+    persona = await db.scalar(
+        select(Persona).options(selectinload(Persona.scenarios).selectinload(Scenario.groups))
+        .where(Persona.id == persona_id)
+    )
     if not persona: raise HTTPException(status_code=404)
-    return templates.TemplateResponse("edit_persona.html", {"request": request, "persona": persona, "username": user})
+    persona.scenarios.sort(key=lambda s: s.time_start)
+    
+    # Pobieramy grupy dla UI
+    all_groups = (await db.execute(select(Group))).scalars().all()
+    
+    return templates.TemplateResponse("edit_persona.html", {"request": request, "persona": persona, "all_groups": all_groups, "username": user})
 
 @router.post("/personas/{persona_id}/update")
-async def update_persona(persona_id: int, name: str = Form(...), system_prompt: str = Form(...), telegram_token: str = Form(None), openrouter_token: str = Form(None), ai_model: str = Form(...), db: AsyncSession = Depends(get_db), user=Depends(auth)):
+async def update_persona(
+    persona_id: int, name: str = Form(...), system_prompt: str = Form(...), 
+    telegram_token: str = Form(None), openrouter_token: str = Form(None), 
+    ai_model: str = Form(...), timezone: str = Form("America/New_York"),
+    db: AsyncSession = Depends(get_db), user=Depends(auth)
+):
     persona = await db.get(Persona, persona_id)
     if persona:
         persona.name = name; persona.system_prompt = system_prompt; persona.ai_model = ai_model
         persona.telegram_token = telegram_token.strip() if telegram_token and telegram_token.strip() else None
         persona.openrouter_token = openrouter_token.strip() if openrouter_token and openrouter_token.strip() else None
+        persona.timezone = timezone.strip() 
         await db.commit()
         if persona.is_active: await init_bot()
     return RedirectResponse(url="/admin/personas", status_code=303)
@@ -158,6 +181,46 @@ async def delete_persona(persona_id: int, db: AsyncSession = Depends(get_db), us
         if persona.is_active: persona.is_active = False; await db.commit(); await init_bot()
         await db.delete(persona); await db.commit()
     return RedirectResponse(url="/admin/personas", status_code=303)
+
+# --- SCENARIO MANAGEMENT ---
+@router.post("/personas/{persona_id}/scenarios/create")
+async def create_scenario(
+    persona_id: int, title: str = Form(...), time_start: str = Form(...), 
+    time_end: str = Form(...), prompt_addition: str = Form(...), 
+    target_type: str = Form("all"), group_ids: List[int] = Form(default=[]), # DODANO GRUPY
+    db: AsyncSession = Depends(get_db), user=Depends(auth)
+):
+    new_scenario = Scenario(
+        persona_id=persona_id, title=title, 
+        time_start=time_start, time_end=time_end, 
+        prompt_addition=prompt_addition, target_type=target_type
+    )
+    
+    if target_type == "groups" and group_ids:
+        for gid in group_ids:
+            group = await db.get(Group, gid)
+            if group:
+                new_scenario.groups.append(group)
+                
+    db.add(new_scenario)
+    await db.commit()
+    return RedirectResponse(url=f"/admin/personas/{persona_id}", status_code=303)
+
+@router.post("/personas/{persona_id}/scenarios/{scenario_id}/toggle")
+async def toggle_scenario(persona_id: int, scenario_id: int, db: AsyncSession = Depends(get_db), user=Depends(auth)):
+    scenario = await db.get(Scenario, scenario_id)
+    if scenario and scenario.persona_id == persona_id:
+        scenario.is_active = not scenario.is_active
+        await db.commit()
+    return RedirectResponse(url=f"/admin/personas/{persona_id}", status_code=303)
+
+@router.post("/personas/{persona_id}/scenarios/{scenario_id}/delete")
+async def delete_scenario(persona_id: int, scenario_id: int, db: AsyncSession = Depends(get_db), user=Depends(auth)):
+    scenario = await db.get(Scenario, scenario_id)
+    if scenario and scenario.persona_id == persona_id:
+        await db.delete(scenario)
+        await db.commit()
+    return RedirectResponse(url=f"/admin/personas/{persona_id}", status_code=303)
 
 # --- BROADCAST SYSTEM ---
 @router.get("/broadcast", response_class=HTMLResponse)

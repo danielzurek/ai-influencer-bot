@@ -15,6 +15,30 @@
                         <label class="form-label small fw-bold text-uppercase">AI Model ID</label>
                         <input type="text" name="ai_model" class="form-control bg-dark text-light border-secondary" value="openrouter/free">
                     </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-uppercase text-warning">Timezone</label>
+                        {% set tzs = [
+                            ('America/New_York', 'America/New_York (Miami / EST)'),
+                            ('America/Chicago', 'America/Chicago (Texas / CST)'),
+                            ('America/Denver', 'America/Denver (Colorado / MST)'),
+                            ('America/Los_Angeles', 'America/Los_Angeles (LA / PST)'),
+                            ('Europe/London', 'Europe/London (UK / GMT)'),
+                            ('Europe/Warsaw', 'Europe/Warsaw (Poland / CET)'),
+                            ('Europe/Berlin', 'Europe/Berlin (Germany / CET)'),
+                            ('Europe/Paris', 'Europe/Paris (France / CET)'),
+                            ('Europe/Madrid', 'Europe/Madrid (Spain / CET)'),
+                            ('Asia/Dubai', 'Asia/Dubai (UAE / GST)'),
+                            ('Asia/Tokyo', 'Asia/Tokyo (Japan / JST)'),
+                            ('Australia/Sydney', 'Australia/Sydney (AEST)')
+                        ] %}
+                        <select name="timezone" class="form-select bg-dark text-light border-warning" required>
+                            {% for tz_val, tz_label in tzs %}
+                            <option value="{{ tz_val }}" {% if tz_val == 'America/New_York' %}selected{% endif %}>{{ tz_label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
                     <div class="mb-3">
                         <label class="form-label small fw-bold text-uppercase">Telegram Token</label>
                         <input type="text" name="telegram_token" class="form-control bg-dark text-light border-secondary" placeholder="Leave empty for default">
