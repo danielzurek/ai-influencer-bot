@@ -403,8 +403,19 @@ async def chat_handler(message: TGMessage, state: FSMContext):
                 await db.commit()
                 await message.answer(final_text)
             
-        except Exception as e: logger.error(f"Error in chat_handler: {e}", exc_info=True)
-        finally: await state.clear()
+        except Exception as e: 
+            logger.error(f"Error in chat_handler: {e}", exc_info=True)
+            # --- FALLBACK MESSAGE KIEDY API PADLE LUB BRAK KREDYTÓW ---
+            try:
+                fallback_text = "ugh babe my signal is acting up so bad right now 😩 I'm gonna hop in the shower, text me in a little bit okay? 💋✨"
+                await message.answer(fallback_text)
+                db.add(Message(user_id=user_id, role="assistant", content=f"[SYSTEM FALLBACK] {fallback_text}", ai_cost=0.0))
+                await db.commit()
+            except Exception as inner_e:
+                logger.error(f"Failed to send fallback msg: {inner_e}")
+            # ----------------------------------------------------------
+        finally: 
+            await state.clear()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
