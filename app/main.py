@@ -92,7 +92,6 @@ async def send_vip_invoice(message: TGMessage):
     bot = await get_bot()
     if not bot: return
     
-    # --- NOWOŚĆ: Pobieranie indywidualnej ceny VIP z bazy ---
     async with AsyncSessionLocal() as db:
         active_persona = await db.scalar(select(Persona).where(Persona.is_active == True).limit(1))
         vip_price = active_persona.vip_subscription_price if active_persona and active_persona.vip_subscription_price else 500
@@ -193,15 +192,35 @@ async def chat_handler(message: TGMessage, state: FSMContext):
                 user = User(telegram_id=user_id, username=message.from_user.first_name, info={})
                 db.add(user); await db.commit()
 
+            # Zapisujemy wiadomość użytkownika NAJPIERW
+            db.add(Message(user_id=user_id, role="user", content=message.text)); await db.commit()
+
+            # --- LOGIKA ODCINANIA DARMOWYCH (THE SILENCE TREATMENT) ---
             now = datetime.utcnow()
             is_vip = user.subscription_expires_at and user.subscription_expires_at.replace(tzinfo=None) > now
 
             if not is_vip:
-                msg_count = await db.scalar(select(func.count(Message.id)).where(Message.user_id == user_id))
-                if msg_count >= 15: 
-                    return await message.answer("My free chat limit is reached babe... I'm waiting for you in my VIP room 😈 Type /vip to unlock me.")
-
-            db.add(Message(user_id=user_id, role="user", content=message.text)); await db.commit()
+                free_limit = active_persona.free_message_limit if active_persona.free_message_limit else 15
+                user_msg_count = await db.scalar(select(func.count(Message.id)).where(Message.user_id == user_id, Message.role == "user"))
+                
+                if user_msg_count == free_limit + 1:
+                    # Wiadomość odcinająca nr 1
+                    warn1 = "Babe, my free chat limit is reached... I'm waiting for you in my VIP room 😈 Type /vip to unlock me."
+                    db.add(Message(user_id=user_id, role="assistant", content=warn1))
+                    await db.commit()
+                    return await message.answer(warn1)
+                
+                elif user_msg_count == free_limit + 2:
+                    # Ostatnie ostrzeżenie nr 2
+                    warn2 = "I'm serious babe 🥺 I can't reply here anymore. Get my VIP so we can play properly... /vip"
+                    db.add(Message(user_id=user_id, role="assistant", content=warn2))
+                    await db.commit()
+                    return await message.answer(warn2)
+                
+                elif user_msg_count > free_limit + 2:
+                    # Cisza - nie odpisujemy w ogóle, ignorujemy dopóki nie wpisze komendy /vip
+                    return 
+            # ------------------------------------------------------------
 
             user_info = ", ".join([f"{k}: {v}" for k, v in user.info.items()]) if user.info else "Unknown"
 

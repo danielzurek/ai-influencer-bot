@@ -55,18 +55,23 @@
                     </div>
 
                     <div class="row">
-                        <div class="col-md-8 mb-3">
+                        <div class="col-md-5 mb-3">
                             <label class="form-label small text-uppercase fw-bold text-info">Private Telegram Channel ID</label>
                             <input type="text" name="private_channel_id" class="form-control bg-dark text-light border-info" value="{{ persona.private_channel_id or '' }}" placeholder="-1001234567890">
-                            <small class="text-muted">VIP Channel ID. Your bot must be added as an Administrator with invite & ban permissions!</small>
+                            <small class="text-muted">Must be an Admin with invite/ban permissions!</small>
                         </div>
-                        
                         <div class="col-md-4 mb-3">
                             <label class="form-label small text-uppercase fw-bold text-success">VIP Price (XTR Stars)</label>
                             <input type="number" id="vip_price_input" name="vip_subscription_price" class="form-control bg-dark text-light border-success" value="{{ persona.vip_subscription_price }}" required>
                             <small class="text-muted d-block mt-1">
                                 <span id="usd_calc_label" class="text-warning fw-bold">Calculating...</span>
                             </small>
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label small text-uppercase fw-bold text-danger">Free Msgs Limit</label>
+                            <input type="number" name="free_message_limit" class="form-control bg-dark text-light border-danger" value="{{ persona.free_message_limit }}" required>
+                            <small class="text-muted">Max free messages allowed for non-VIP users.</small>
                         </div>
                     </div>
 
@@ -214,14 +219,11 @@
         document.getElementById('scenarioGroupSelection').style.display = show ? 'block' : 'none';
     }
 
-    // --- TELEGRAM STARS TO USD CALCULATOR ---
     document.addEventListener("DOMContentLoaded", function() {
         const priceInput = document.getElementById('vip_price_input');
         const usdLabel = document.getElementById('usd_calc_label');
         
-        // Payout rate (Netto) ~ $0.013 USD
         const STAR_PAYOUT_RATE = 0.013; 
-        // Cost rate (Brutto) ~ $0.02 USD
         const STAR_COST_RATE = 0.020;
 
         if (priceInput && usdLabel) {

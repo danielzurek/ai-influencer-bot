@@ -121,7 +121,6 @@ async def create_persona(
     ai_model: str = Form("openrouter/free"), timezone: str = Form("America/New_York"),
     db: AsyncSession = Depends(get_db), user=Depends(auth)
 ):
-    # USUNIĘTE: Kanał i Cena z parametru wejściowego
     t_token = telegram_token.strip() if telegram_token and telegram_token.strip() else None
     o_token = openrouter_token.strip() if openrouter_token and openrouter_token.strip() else None
     tz = timezone.strip() if timezone and timezone.strip() else "America/New_York"
@@ -150,6 +149,7 @@ async def update_persona(
     telegram_token: str = Form(None), openrouter_token: str = Form(None), 
     ai_model: str = Form(...), timezone: str = Form("America/New_York"),
     private_channel_id: str = Form(None), vip_subscription_price: int = Form(500), 
+    free_message_limit: int = Form(15), # NOWOŚĆ
     db: AsyncSession = Depends(get_db), user=Depends(auth)
 ):
     persona = await db.get(Persona, persona_id)
@@ -160,6 +160,7 @@ async def update_persona(
         persona.timezone = timezone.strip()
         persona.private_channel_id = private_channel_id.strip() if private_channel_id and private_channel_id.strip() else None
         persona.vip_subscription_price = vip_subscription_price
+        persona.free_message_limit = free_message_limit
         await db.commit()
         if persona.is_active: await init_bot()
     return RedirectResponse(url="/admin/personas", status_code=303)

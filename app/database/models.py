@@ -73,9 +73,10 @@ class Persona(Base):
     ai_model: Mapped[str] = mapped_column(String(100), default="openrouter/free")
     timezone: Mapped[str] = mapped_column(String(50), default="America/New_York")
     private_channel_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    
-    # --- NOWOŚĆ: Indywidualna cena subskrypcji VIP ---
     vip_subscription_price: Mapped[int] = mapped_column(Integer, default=500)
+    
+    # --- NOWOŚĆ: Limit darmowych wiadomości ---
+    free_message_limit: Mapped[int] = mapped_column(Integer, default=15)
     
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
