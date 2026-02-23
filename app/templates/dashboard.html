@@ -11,7 +11,7 @@
     <div class="col-md-3">
         <div class="card p-3 shadow-sm">
             <h3>{{ vip_users }}</h3>
-            <small class="text-warning text-uppercase fw-bold">VIP Subscribers</small>
+            <small class="text-warning text-uppercase fw-bold">Active VIPs</small>
         </div>
     </div>
     <div class="col-md-3">
@@ -24,6 +24,10 @@
         <div class="card p-3 shadow-sm border-success">
             <h3 class="text-success">⭐ {{ total_revenue }}</h3>
             <small class="text-secondary text-uppercase fw-bold">Total Revenue (XTR)</small>
+            <div class="mt-2" style="font-size: 0.85rem;">
+                <span class="text-muted">Gross:</span> <strong>~${{ "%.2f"|format(total_revenue * 0.020) }}</strong><br>
+                <span class="text-muted">Net Payout:</span> <strong class="text-success">~${{ "%.2f"|format(total_revenue * 0.013) }}</strong>
+            </div>
         </div>
     </div>
 </div>
@@ -49,8 +53,9 @@
                         <td class="ps-3"><code>{{ user.telegram_id }}</code></td>
                         <td class="fw-bold">{{ user.username or "Anonymous" }}</td>
                         <td>
-                            {% if user.is_vip %}
+                            {% if user.subscription_expires_at %}
                             <span class="badge bg-warning text-dark shadow-sm">VIP subscriber</span>
+                            <br><small class="text-muted">Exp: {{ user.subscription_expires_at.strftime('%Y-%m-%d') }}</small>
                             {% else %}
                             <span class="badge bg-secondary">Free Tier</span>
                             {% endif %}

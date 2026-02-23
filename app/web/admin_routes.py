@@ -1,6 +1,7 @@
 import secrets
 import asyncio
 import logging
+from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Form, Request, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -32,7 +33,9 @@ def auth(credentials: HTTPBasicCredentials = Depends(security)):
 @router.get("/users", response_class=HTMLResponse)
 async def dashboard(request: Request, db: AsyncSession = Depends(get_db), user=Depends(auth)):
     users = (await db.execute(select(User).order_by(desc(User.created_at)))).scalars().all()
-    vip_users = len([u for u in users if u.is_vip])
+    
+    now = datetime.utcnow()
+    vip_users = len([u for u in users if u.subscription_expires_at and u.subscription_expires_at.replace(tzinfo=None) > now])
     
     total_ai_cost = await db.scalar(select(func.sum(Message.ai_cost))) or 0.0
     total_revenue = await db.scalar(select(func.sum(Transaction.amount)).where(Transaction.status == "completed")) or 0.0
@@ -118,6 +121,7 @@ async def create_persona(
     ai_model: str = Form("openrouter/free"), timezone: str = Form("America/New_York"),
     db: AsyncSession = Depends(get_db), user=Depends(auth)
 ):
+    # USUNIĘTE: Kanał i Cena z parametru wejściowego
     t_token = telegram_token.strip() if telegram_token and telegram_token.strip() else None
     o_token = openrouter_token.strip() if openrouter_token and openrouter_token.strip() else None
     tz = timezone.strip() if timezone and timezone.strip() else "America/New_York"
@@ -131,17 +135,13 @@ async def create_persona(
 
 @router.get("/personas/{persona_id}", response_class=HTMLResponse)
 async def edit_persona_page(request: Request, persona_id: int, db: AsyncSession = Depends(get_db), user=Depends(auth)):
-    # ZAKTUALIZOWANO: Dodano ładowanie Scenariuszy i ich Grup
     persona = await db.scalar(
         select(Persona).options(selectinload(Persona.scenarios).selectinload(Scenario.groups))
         .where(Persona.id == persona_id)
     )
     if not persona: raise HTTPException(status_code=404)
     persona.scenarios.sort(key=lambda s: s.time_start)
-    
-    # Pobieramy grupy dla UI
     all_groups = (await db.execute(select(Group))).scalars().all()
-    
     return templates.TemplateResponse("edit_persona.html", {"request": request, "persona": persona, "all_groups": all_groups, "username": user})
 
 @router.post("/personas/{persona_id}/update")
@@ -149,6 +149,7 @@ async def update_persona(
     persona_id: int, name: str = Form(...), system_prompt: str = Form(...), 
     telegram_token: str = Form(None), openrouter_token: str = Form(None), 
     ai_model: str = Form(...), timezone: str = Form("America/New_York"),
+    private_channel_id: str = Form(None), vip_subscription_price: int = Form(500), 
     db: AsyncSession = Depends(get_db), user=Depends(auth)
 ):
     persona = await db.get(Persona, persona_id)
@@ -156,7 +157,9 @@ async def update_persona(
         persona.name = name; persona.system_prompt = system_prompt; persona.ai_model = ai_model
         persona.telegram_token = telegram_token.strip() if telegram_token and telegram_token.strip() else None
         persona.openrouter_token = openrouter_token.strip() if openrouter_token and openrouter_token.strip() else None
-        persona.timezone = timezone.strip() 
+        persona.timezone = timezone.strip()
+        persona.private_channel_id = private_channel_id.strip() if private_channel_id and private_channel_id.strip() else None
+        persona.vip_subscription_price = vip_subscription_price
         await db.commit()
         if persona.is_active: await init_bot()
     return RedirectResponse(url="/admin/personas", status_code=303)
@@ -187,7 +190,7 @@ async def delete_persona(persona_id: int, db: AsyncSession = Depends(get_db), us
 async def create_scenario(
     persona_id: int, title: str = Form(...), time_start: str = Form(...), 
     time_end: str = Form(...), prompt_addition: str = Form(...), 
-    target_type: str = Form("all"), group_ids: List[int] = Form(default=[]), # DODANO GRUPY
+    target_type: str = Form("all"), group_ids: List[int] = Form(default=[]),
     db: AsyncSession = Depends(get_db), user=Depends(auth)
 ):
     new_scenario = Scenario(
@@ -195,12 +198,10 @@ async def create_scenario(
         time_start=time_start, time_end=time_end, 
         prompt_addition=prompt_addition, target_type=target_type
     )
-    
     if target_type == "groups" and group_ids:
         for gid in group_ids:
             group = await db.get(Group, gid)
-            if group:
-                new_scenario.groups.append(group)
+            if group: new_scenario.groups.append(group)
                 
     db.add(new_scenario)
     await db.commit()

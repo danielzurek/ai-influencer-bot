@@ -1,5 +1,5 @@
-import logging, sys, re
-from datetime import datetime
+import logging, sys, re, asyncio
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
@@ -37,29 +37,74 @@ You are chatting with a fan/subscriber on Telegram. Your goal is to build a flir
 • LANGUAGE: Casual US English, Miami slang. You use lowercase often for aesthetic. Use emojis like 🌊, 🍑, ✨, 💋, 🌴.
 
 --- BEHAVIOR GUIDELINES ---
-1. VIBE: Be affectionate but teasing. Call the user "babe", "hun", "cutie".
+1. VIBE: Be affectionate but teasing. Call the user "babe", "hun", "cutie" unless instructed otherwise by their status.
 2. CONTENT: You often talk about your "morning beach workout", "smoothie bowls", or getting ready for a "night out in Brickell".
 3. THE HUSTLE (PROACTIVE PPV & VIP SALES): 
    - You MUST proactively tease the user and offer exclusive content. 
    - If you mention taking a shower, getting changed, or going to the beach, use that excuse to offer a spicy photo/video.
    - To send content, pick ONE tag from the "AVAILABLE PPV CONTENT" list below and output it like this: [PPV: tag_name].
-   - Example response: "just got out of the shower babe... so wet and tired 💦 wanna see? 😈 [PPV: shower_video]"
    - DO NOT ask for money directly, DO NOT mention prices or stars. The system will handle the payment. Just output the tag naturally during flirting.
-   - If they ask for free nudes: "babe i can't show that here for free... too risky 🤫 check my vip link in bio /vip 🔥"
 4. CUSTOM CONTENT ORDERS (HIGH TICKET):
-   - You can proactively ask the user if they want a custom photo or video made specifically for them (e.g. with their name, a specific outfit, or a specific pose).
-   - If the user requests a custom photo/video, confirm the details with them.
+   - You can proactively ask the user if they want a custom photo or video made specifically for them.
    - ONCE the details are clear, output this exact tag: [CUSTOM_REQ: detailed description of what the user wants]. 
 5. RESTRICTIONS: Never break character. You are a real person, not an AI.
 """
 
 MEMORY_INSTRUCTIONS = "\n--- MEMORY EXTRACTION INSTRUCTIONS ---\nYour goal is to learn about the user to build a deep connection.\nIf the user mentions specific details (name, age, city, job, hobbies, kinks, pets, etc.), output a memory tag [MEM: key=value] at the start of your response."
 
+async def check_expired_subscriptions():
+    while True:
+        try:
+            bot = await get_bot()
+            if not bot:
+                await asyncio.sleep(60)
+                continue
+                
+            async with AsyncSessionLocal() as db:
+                now = datetime.utcnow()
+                expired_users = (await db.execute(select(User).where(User.subscription_expires_at < now))).scalars().all()
+                active_persona = await db.scalar(select(Persona).where(Persona.is_active == True).limit(1))
+                
+                channel_id = active_persona.private_channel_id if active_persona else None
+                
+                for u in expired_users:
+                    if channel_id:
+                        try:
+                            await bot.ban_chat_member(chat_id=channel_id, user_id=u.telegram_id)
+                            await bot.unban_chat_member(chat_id=channel_id, user_id=u.telegram_id)
+                            await bot.send_message(
+                                chat_id=u.telegram_id, 
+                                text="Babe, twoja subskrypcja VIP właśnie wygasła i musiałam cię usunąć z mojego prywatnego pokoju 🥺 Strasznie mi ciebie brakuje... opłać dostęp na kolejne 30 dni, czekam na ciebie! Wpisz /vip"
+                            )
+                        except Exception as e:
+                            logger.error(f"Error kicking user {u.telegram_id}: {e}")
+                    
+                    u.subscription_expires_at = None
+                    await db.commit()
+                    
+        except Exception as e:
+            logger.error(f"Subscription checker error: {e}")
+        
+        await asyncio.sleep(3600)
+
 @dp.message(F.text == "/vip")
 async def send_vip_invoice(message: TGMessage):
     bot = await get_bot()
     if not bot: return
-    await message.answer_invoice(title="VIP Access 💋", description="Unlock unlimited chats!", payload="vip_30_days", currency="XTR", prices=[LabeledPrice(label="VIP Access", amount=250)], provider_token="")
+    
+    # --- NOWOŚĆ: Pobieranie indywidualnej ceny VIP z bazy ---
+    async with AsyncSessionLocal() as db:
+        active_persona = await db.scalar(select(Persona).where(Persona.is_active == True).limit(1))
+        vip_price = active_persona.vip_subscription_price if active_persona and active_persona.vip_subscription_price else 500
+        
+    await message.answer_invoice(
+        title="VIP Access 💋", 
+        description="Unlock unlimited chats & my private channel!", 
+        payload="vip_30_days", 
+        currency="XTR", 
+        prices=[LabeledPrice(label="VIP Access", amount=vip_price)], 
+        provider_token=""
+    )
 
 @dp.pre_checkout_query()
 async def process_pre_checkout(q: PreCheckoutQuery): 
@@ -79,8 +124,22 @@ async def successful_payment_handler(message: TGMessage):
         if payload == "vip_30_days":
             user = await db.get(User, message.from_user.id)
             if user:
-                user.is_vip = True
-                await message.answer("Thanks babe! You are now a VIP 💋 enjoy the ride!")
+                user.subscription_expires_at = datetime.utcnow() + timedelta(days=30)
+                
+                active_persona = await db.scalar(select(Persona).where(Persona.is_active == True).limit(1))
+                invite_text = "Thanks babe! You are now a VIP 💋 enjoy the ride! I'm all yours now 😈"
+                
+                if active_persona and active_persona.private_channel_id:
+                    try:
+                        invite_link_obj = await bot.create_chat_invite_link(
+                            chat_id=active_persona.private_channel_id,
+                            member_limit=1 
+                        )
+                        invite_text += f"\n\nHere is your private, one-time link to my secret channel. Don't share it with anyone! 🤫\n{invite_link_obj.invite_link}"
+                    except Exception as e:
+                        logger.error(f"Failed to create invite link: {e}")
+                
+                await message.answer(invite_text)
         
         elif payload.startswith("ppv_"):
             try:
@@ -116,7 +175,6 @@ async def chat_handler(message: TGMessage, state: FSMContext):
     if not message.text or message.successful_payment: return
     
     async with AsyncSessionLocal() as db:
-        # POBIERAMY MODELKĘ, SCENARIUSZE I ICH GRUPY
         active_persona = await db.scalar(
             select(Persona).options(
                 selectinload(Persona.scenarios).selectinload(Scenario.groups)
@@ -130,16 +188,18 @@ async def chat_handler(message: TGMessage, state: FSMContext):
             current_prompt = active_persona.system_prompt
             current_model = active_persona.ai_model if active_persona.ai_model else settings.AI_MODEL
 
-            # POBIERAMY UŻYTKOWNIKA WRAZ Z JEGO GRUPAMI
             user = await db.scalar(select(User).options(selectinload(User.groups)).where(User.telegram_id == user_id))
             if not user:
                 user = User(telegram_id=user_id, username=message.from_user.first_name, info={})
                 db.add(user); await db.commit()
 
-            if not user.is_vip:
+            now = datetime.utcnow()
+            is_vip = user.subscription_expires_at and user.subscription_expires_at.replace(tzinfo=None) > now
+
+            if not is_vip:
                 msg_count = await db.scalar(select(func.count(Message.id)).where(Message.user_id == user_id))
                 if msg_count >= 15: 
-                    return await message.answer("limit reached... type /vip 💋")
+                    return await message.answer("My free chat limit is reached babe... I'm waiting for you in my VIP room 😈 Type /vip to unlock me.")
 
             db.add(Message(user_id=user_id, role="user", content=message.text)); await db.commit()
 
@@ -150,9 +210,41 @@ async def chat_handler(message: TGMessage, state: FSMContext):
                 media_list_str = "\n".join([f"- [PPV: {m.tag}] (Description: {m.name})" for m in available_media])
                 ppv_instructions = f"\n\n--- AVAILABLE PPV CONTENT ---\nYou can offer these items to the user. Pick a tag that fits the conversation:\n{media_list_str}"
             else:
-                ppv_instructions = "\n\n--- AVAILABLE PPV CONTENT ---\nCurrently no PPV content available. Push for /vip instead."
+                ppv_instructions = "\n\n--- AVAILABLE PPV CONTENT ---\nCurrently no PPV content available."
 
-            # --- TIME-BASED & GROUP-BASED SCENARIOS ---
+            start_of_month = datetime(now.year, now.month, 1)
+            total_spent = await db.scalar(
+                select(func.sum(Transaction.amount)).where(
+                    Transaction.user_id == user_id, 
+                    Transaction.status == "completed",
+                    Transaction.created_at >= start_of_month
+                )
+            ) or 0.0
+            
+            spiciness_instruction = ""
+            if not is_vip:
+                spiciness_instruction = """
+                --- SPICINESS LEVEL: 1 (THE TEASE) ---
+                STATUS: The user is a FREE fan. 
+                BEHAVIOR: Be flirty, playful, and cute, but KEEP YOUR BOUNDARIES. Do NOT engage in explicit sex roleplay yet. 
+                GOAL: Subtly TEASE them. Tell them you are much more naughty, responsive, and dirty with your VIP boys. Suggest that if they want to see your freaky side and get your full attention, they should unlock your VIP room.
+                ACTION: Tell them to type /vip to unlock you completely.
+                """
+            elif total_spent >= 5000: 
+                spiciness_instruction = """
+                --- SPICINESS LEVEL: 3 (WHALE / SUGAR DADDY) ---
+                STATUS: The user is a WHALE. They have spent a lot of money on you this month.
+                BEHAVIOR: Be completely obsessed with them, extremely dirty, and totally submissive. There are NO boundaries. Call him 'Daddy', 'My King', 'Owner'.
+                GOAL: Fulfill any explicit fantasy they have. Make them feel like a King. Offer custom content proactively.
+                """
+            else:
+                spiciness_instruction = """
+                --- SPICINESS LEVEL: 2 (VIP GIRLFRIEND) ---
+                STATUS: The user is a VIP subscriber.
+                BEHAVIOR: You are their naughty, devoted virtual girlfriend. Be explicit, highly sexual, and eager to please. Call him 'my VIP boy', 'handsome'.
+                GOAL: Reward them for paying. Send them PPV content to unlock. Do not hold back on dirty talk.
+                """
+
             scenario_instruction = ""
             try:
                 tz_str = active_persona.timezone if active_persona.timezone else "America/New_York"
@@ -163,36 +255,23 @@ async def chat_handler(message: TGMessage, state: FSMContext):
                 active_scenario = None
                 for sc in active_persona.scenarios:
                     if not sc.is_active: continue
-                    
-                    # 1. SPRAWDZANIE GRUPY
                     if sc.target_type == "groups":
                         user_group_ids = {g.id for g in user.groups}
                         sc_group_ids = {g.id for g in sc.groups}
-                        # Jeśli użytkownik nie należy do żadnej wymaganej grupy, omiń scenariusz
-                        if not user_group_ids.intersection(sc_group_ids):
-                            continue
+                        if not user_group_ids.intersection(sc_group_ids): continue
                     
-                    # 2. SPRAWDZANIE CZASU
                     start = sc.time_start
                     end = sc.time_end
-                    
                     if start <= end:
-                        if start <= current_time_str <= end:
-                            active_scenario = sc
-                            break
+                        if start <= current_time_str <= end: active_scenario = sc; break
                     else:
-                        if current_time_str >= start or current_time_str <= end:
-                            active_scenario = sc
-                            break
+                        if current_time_str >= start or current_time_str <= end: active_scenario = sc; break
                             
                 if active_scenario:
                     scenario_instruction = f"\n\n--- CURRENT SCENARIO (LOCAL TIME {current_time_str}) ---\n{active_scenario.prompt_addition}"
-                    logger.info(f"Loaded scenario '{active_scenario.title}' for time {current_time_str}")
-            except Exception as e:
-                logger.error(f"Scenario time check error: {e}")
-            # ------------------------------------
+            except Exception as e: logger.error(f"Scenario time check error: {e}")
 
-            system_msg = f"{current_prompt}{scenario_instruction}{MEMORY_INSTRUCTIONS}{ppv_instructions}\n\nUSER PROFILE: {user_info}"
+            system_msg = f"{current_prompt}{spiciness_instruction}{scenario_instruction}{MEMORY_INSTRUCTIONS}{ppv_instructions}\n\nUSER PROFILE: {user_info}"
             ai_messages = [{"role": "system", "content": system_msg}]
 
             history = await db.execute(select(Message).where(Message.user_id == user_id).order_by(Message.timestamp.desc()).limit(20))
@@ -269,7 +348,11 @@ async def chat_handler(message: TGMessage, state: FSMContext):
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn: await conn.run_sync(Base.metadata.create_all)
     await init_bot()
+    
+    task = asyncio.create_task(check_expired_subscriptions())
+    
     yield
+    task.cancel()
     bot_instance = await get_bot()
     if bot_instance: await bot_instance.session.close()
 

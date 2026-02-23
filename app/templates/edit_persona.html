@@ -3,10 +3,9 @@
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-10">
-        
         <div class="card shadow-lg mb-4">
             <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-3">
-                <h5 class="mb-0">Edit Core Identity: {{ persona.name }}</h5>
+                <h5 class="mb-0">Edit Persona: {{ persona.name }}</h5>
                 <a href="/admin/personas" class="btn btn-sm btn-outline-light">Back to List</a>
             </div>
             <div class="card-body p-4">
@@ -55,18 +54,34 @@
                         </div>
                     </div>
 
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label small text-uppercase fw-bold text-info">Private Telegram Channel ID</label>
+                            <input type="text" name="private_channel_id" class="form-control bg-dark text-light border-info" value="{{ persona.private_channel_id or '' }}" placeholder="-1001234567890">
+                            <small class="text-muted">VIP Channel ID. Your bot must be added as an Administrator with invite & ban permissions!</small>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label small text-uppercase fw-bold text-success">VIP Price (XTR Stars)</label>
+                            <input type="number" id="vip_price_input" name="vip_subscription_price" class="form-control bg-dark text-light border-success" value="{{ persona.vip_subscription_price }}" required>
+                            <small class="text-muted d-block mt-1">
+                                <span id="usd_calc_label" class="text-warning fw-bold">Calculating...</span>
+                            </small>
+                        </div>
+                    </div>
+
                     <div class="mb-3">
-                        <label class="form-label small text-uppercase fw-bold">Core System Prompt (Never Changes)</label>
+                        <label class="form-label small text-uppercase fw-bold">System Prompt</label>
                         <textarea name="system_prompt" class="form-control bg-dark text-light border-secondary font-monospace" rows="12" required>{{ persona.system_prompt }}</textarea>
                     </div>
 
-                    <div class="d-grid pt-2">
-                        <button type="submit" class="btn btn-primary btn-lg">Update Core Configuration</button>
+                    <div class="d-grid pt-3">
+                        <button type="submit" class="btn btn-primary btn-lg">Update Model Configuration</button>
                     </div>
                 </form>
             </div>
         </div>
-        
+
         <h4 class="mb-3 mt-5 text-info border-bottom border-secondary pb-2">🕰️ Dynamic Time-Based Scenarios</h4>
         
         <div class="row">
@@ -182,7 +197,6 @@
                                 <tr>
                                     <td colspan="4" class="text-center py-5 text-muted">
                                         <h5>No scenarios added yet.</h5>
-                                        <p class="small">Add time-based scripts on the left to make your AI more dynamic.</p>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -192,7 +206,6 @@
                 </div>
             </div>
         </div>
-
     </div>
 </div>
 
@@ -200,5 +213,28 @@
     function toggleScenarioGroups(show) {
         document.getElementById('scenarioGroupSelection').style.display = show ? 'block' : 'none';
     }
+
+    // --- TELEGRAM STARS TO USD CALCULATOR ---
+    document.addEventListener("DOMContentLoaded", function() {
+        const priceInput = document.getElementById('vip_price_input');
+        const usdLabel = document.getElementById('usd_calc_label');
+        
+        // Payout rate (Netto) ~ $0.013 USD
+        const STAR_PAYOUT_RATE = 0.013; 
+        // Cost rate (Brutto) ~ $0.02 USD
+        const STAR_COST_RATE = 0.020;
+
+        if (priceInput && usdLabel) {
+            function updateUsd() {
+                const val = parseFloat(priceInput.value) || 0;
+                const gross = (val * STAR_COST_RATE).toFixed(2);
+                const net = (val * STAR_PAYOUT_RATE).toFixed(2);
+                usdLabel.innerHTML = `Gross: ~$${gross} | Net Payout: <span class="text-success">~$${net}</span>`;
+            }
+
+            priceInput.addEventListener('input', updateUsd);
+            updateUsd(); 
+        }
+    });
 </script>
 {% endblock %}
