@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card shadow-lg border-danger">
+    <div class="card-header bg-danger text-white fw-bold d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">💔 Expired VIP Users</h5>
+        <span class="badge bg-light text-danger">{{ expired_users|length }} Users</span>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-dark table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th class="ps-3">User</th>
+                    <th>Expired On</th>
+                    <th>Days Since Expiry</th>
+                    <th class="text-end pe-3">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in expired_users %}
+                <tr>
+                    <td class="ps-3">
+                        <span class="fw-bold">{{ u.username or "Unknown" }}</span><br>
+                        <code class="text-muted">{{ u.telegram_id }}</code>
+                    </td>
+                    <td class="text-warning">
+                        {{ u.subscription_expires_at.strftime('%Y-%m-%d %H:%M') }}
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary">{{ u.days_expired }} days ago</span>
+                    </td>
+                    <td class="text-end pe-3">
+                        <button type="button" class="btn btn-sm btn-danger fw-bold" data-bs-toggle="modal" data-bs-target="#renewModal{{ u.telegram_id }}">
+                            Send Renewal Invite
+                        </button>
+
+                        <div class="modal fade text-start" id="renewModal{{ u.telegram_id }}" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content bg-dark text-light border-danger">
+                                    <div class="modal-header border-danger">
+                                        <h5 class="modal-title">Renew {{ u.username }}</h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <form action="/admin/expired_vips/{{ u.telegram_id }}/renew" method="post">
+                                        <div class="modal-body">
+                                            <p class="small text-muted mb-3">This will send a custom message followed by the VIP invoice.</p>
+                                            <div class="mb-3">
+                                                <label class="form-label text-warning small fw-bold">Custom Message</label>
+                                                <textarea name="message_text" class="form-control bg-dark text-light border-secondary" rows="4" required>Hey babe 🥺 I noticed your VIP expired {{ u.days_expired }} days ago... My private room feels so empty without you. Claim your spot back and let's play 😈👇</textarea>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer border-danger">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                            <button type="submit" class="btn btn-danger fw-bold">Send Invoice</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" class="text-center py-4 text-muted">No expired VIPs at the moment. Good retention!</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -149,7 +149,7 @@ async def update_persona(
     telegram_token: str = Form(None), openrouter_token: str = Form(None), 
     ai_model: str = Form(...), timezone: str = Form("America/New_York"),
     private_channel_id: str = Form(None), vip_subscription_price: int = Form(500), 
-    free_message_limit: int = Form(15), # NOWOŚĆ
+    free_message_limit: int = Form(15), 
     db: AsyncSession = Depends(get_db), user=Depends(auth)
 ):
     persona = await db.get(Persona, persona_id)
@@ -319,3 +319,46 @@ async def reject_custom_request(req_id: int, db: AsyncSession = Depends(get_db),
     req = await db.get(CustomRequest, req_id)
     if req: req.status = "rejected"; await db.commit()
     return RedirectResponse(url="/admin/customs", status_code=303)
+
+# --- EXPIRED VIPS DASHBOARD ---
+@router.get("/expired_vips", response_class=HTMLResponse)
+async def expired_vips_list(request: Request, db: AsyncSession = Depends(get_db), user=Depends(auth)):
+    now = datetime.utcnow()
+    # Pobieramy użytkowników, których data wygaśnięcia jest w przeszłości
+    expired_users = (await db.execute(
+        select(User).where(User.subscription_expires_at < now).order_by(desc(User.subscription_expires_at))
+    )).scalars().all()
+    
+    # Obliczamy w pythonie ilość dni od wygaśnięcia dla wygody szablonu
+    for u in expired_users:
+        u.days_expired = (now - u.subscription_expires_at.replace(tzinfo=None)).days
+        
+    return templates.TemplateResponse("expired_vips.html", {"request": request, "expired_users": expired_users, "username": user})
+
+@router.post("/expired_vips/{user_id}/renew")
+async def send_renewal_invite(user_id: int, message_text: str = Form(...), db: AsyncSession = Depends(get_db), user=Depends(auth)):
+    bot = await get_bot()
+    if not bot:
+        return RedirectResponse(url="/admin/expired_vips", status_code=303)
+        
+    async with AsyncSessionLocal() as session:
+        active_persona = await session.scalar(select(Persona).where(Persona.is_active == True).limit(1))
+        vip_price = active_persona.vip_subscription_price if active_persona else 500
+        
+    try:
+        if message_text.strip():
+            await bot.send_message(chat_id=user_id, text=message_text)
+            
+        await bot.send_invoice(
+            chat_id=user_id,
+            title="VIP Renewal 💋", 
+            description="Come back to my private room, I missed you!", 
+            payload="vip_30_days", 
+            currency="XTR", 
+            prices=[LabeledPrice(label="VIP Access", amount=vip_price)], 
+            provider_token=""
+        )
+    except Exception as e:
+        logger.error(f"Failed to send renewal to {user_id}: {e}")
+        
+    return RedirectResponse(url="/admin/expired_vips", status_code=303)

@@ -68,6 +68,12 @@ async def check_expired_subscriptions():
                 channel_id = active_persona.private_channel_id if active_persona else None
                 
                 for u in expired_users:
+                    user_info = dict(u.info) if u.info else {}
+                    
+                    # Jeśli już wyrzuciliśmy usera, pomijamy
+                    if user_info.get("vip_kicked"):
+                        continue
+                        
                     if channel_id:
                         try:
                             await bot.ban_chat_member(chat_id=channel_id, user_id=u.telegram_id)
@@ -79,7 +85,10 @@ async def check_expired_subscriptions():
                         except Exception as e:
                             logger.error(f"Error kicking user {u.telegram_id}: {e}")
                     
-                    u.subscription_expires_at = None
+                    # Zaznaczamy w info, że proces wyrzucania się odbył, zostawiając datę w bazie!
+                    user_info["vip_kicked"] = True
+                    u.info = user_info
+                    flag_modified(u, "info")
                     await db.commit()
                     
         except Exception as e:
@@ -123,7 +132,19 @@ async def successful_payment_handler(message: TGMessage):
         if payload == "vip_30_days":
             user = await db.get(User, message.from_user.id)
             if user:
-                user.subscription_expires_at = datetime.utcnow() + timedelta(days=30)
+                # Przedłużamy VIP o 30 dni od teraz (lub od poprzedniej daty, jeśli jeszcze aktywna)
+                now = datetime.utcnow()
+                if user.subscription_expires_at and user.subscription_expires_at > now:
+                    user.subscription_expires_at = user.subscription_expires_at + timedelta(days=30)
+                else:
+                    user.subscription_expires_at = now + timedelta(days=30)
+                
+                # Zdejmujemy flagę wyrzucenia
+                user_info = dict(user.info) if user.info else {}
+                if "vip_kicked" in user_info:
+                    del user_info["vip_kicked"]
+                    user.info = user_info
+                    flag_modified(user, "info")
                 
                 active_persona = await db.scalar(select(Persona).where(Persona.is_active == True).limit(1))
                 invite_text = "Thanks babe! You are now a VIP 💋 enjoy the ride! I'm all yours now 😈"
@@ -192,7 +213,6 @@ async def chat_handler(message: TGMessage, state: FSMContext):
                 user = User(telegram_id=user_id, username=message.from_user.first_name, info={})
                 db.add(user); await db.commit()
 
-            # Zapisujemy wiadomość użytkownika NAJPIERW
             db.add(Message(user_id=user_id, role="user", content=message.text)); await db.commit()
 
             # --- LOGIKA ODCINANIA DARMOWYCH (THE SILENCE TREATMENT) ---
@@ -201,24 +221,38 @@ async def chat_handler(message: TGMessage, state: FSMContext):
 
             if not is_vip:
                 free_limit = active_persona.free_message_limit if active_persona.free_message_limit else 15
-                user_msg_count = await db.scalar(select(func.count(Message.id)).where(Message.user_id == user_id, Message.role == "user"))
+                
+                # Jeśli użytkownik miał kiedyś VIP-a, liczymy wiadomości wysłane TYLKO po wygaśnięciu VIP-a.
+                # W ten sposób po wygaśnięciu dostaje znów pulę 'free_limit' wiadomości.
+                if user.subscription_expires_at:
+                    user_msg_count = await db.scalar(
+                        select(func.count(Message.id)).where(
+                            Message.user_id == user_id, 
+                            Message.role == "user",
+                            Message.timestamp > user.subscription_expires_at
+                        )
+                    )
+                else:
+                    user_msg_count = await db.scalar(
+                        select(func.count(Message.id)).where(
+                            Message.user_id == user_id, 
+                            Message.role == "user"
+                        )
+                    )
                 
                 if user_msg_count == free_limit + 1:
-                    # Wiadomość odcinająca nr 1
                     warn1 = "Babe, my free chat limit is reached... I'm waiting for you in my VIP room 😈 Type /vip to unlock me."
                     db.add(Message(user_id=user_id, role="assistant", content=warn1))
                     await db.commit()
                     return await message.answer(warn1)
                 
                 elif user_msg_count == free_limit + 2:
-                    # Ostatnie ostrzeżenie nr 2
                     warn2 = "I'm serious babe 🥺 I can't reply here anymore. Get my VIP so we can play properly... /vip"
                     db.add(Message(user_id=user_id, role="assistant", content=warn2))
                     await db.commit()
                     return await message.answer(warn2)
                 
                 elif user_msg_count > free_limit + 2:
-                    # Cisza - nie odpisujemy w ogóle, ignorujemy dopóki nie wpisze komendy /vip
                     return 
             # ------------------------------------------------------------
 
@@ -242,13 +276,21 @@ async def chat_handler(message: TGMessage, state: FSMContext):
             
             spiciness_instruction = ""
             if not is_vip:
-                spiciness_instruction = """
-                --- SPICINESS LEVEL: 1 (THE TEASE) ---
-                STATUS: The user is a FREE fan. 
-                BEHAVIOR: Be flirty, playful, and cute, but KEEP YOUR BOUNDARIES. Do NOT engage in explicit sex roleplay yet. 
-                GOAL: Subtly TEASE them. Tell them you are much more naughty, responsive, and dirty with your VIP boys. Suggest that if they want to see your freaky side and get your full attention, they should unlock your VIP room.
-                ACTION: Tell them to type /vip to unlock you completely.
-                """
+                if user.subscription_expires_at:
+                    spiciness_instruction = """
+                    --- SPICINESS LEVEL: 1.5 (FORMER VIP) ---
+                    STATUS: The user is a FORMER VIP whose subscription has EXPIRED.
+                    BEHAVIOR: You remember they used to be in your private club. Be a bit sad but teasing that they lost access to your explicit side. 
+                    GOAL: Make them miss you. Tell them you miss playing with them and they need to renew to see you naked again. Tell them to type /vip.
+                    """
+                else:
+                    spiciness_instruction = """
+                    --- SPICINESS LEVEL: 1 (THE TEASE) ---
+                    STATUS: The user is a FREE fan. 
+                    BEHAVIOR: Be flirty, playful, and cute, but KEEP YOUR BOUNDARIES. Do NOT engage in explicit sex roleplay yet. 
+                    GOAL: Subtly TEASE them. Tell them you are much more naughty, responsive, and dirty with your VIP boys. Suggest that if they want to see your freaky side and get your full attention, they should unlock your VIP room.
+                    ACTION: Tell them to type /vip to unlock you completely.
+                    """
             elif total_spent >= 5000: 
                 spiciness_instruction = """
                 --- SPICINESS LEVEL: 3 (WHALE / SUGAR DADDY) ---
