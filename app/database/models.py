@@ -74,10 +74,7 @@ class Persona(Base):
     timezone: Mapped[str] = mapped_column(String(50), default="America/New_York")
     private_channel_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     vip_subscription_price: Mapped[int] = mapped_column(Integer, default=500)
-    
-    # --- NOWOŚĆ: Limit darmowych wiadomości ---
     free_message_limit: Mapped[int] = mapped_column(Integer, default=15)
-    
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     scenarios: Mapped[List["Scenario"]] = relationship("Scenario", back_populates="persona", cascade="all, delete-orphan")
@@ -103,6 +100,16 @@ class MediaContent(Base):
     file_id: Mapped[str] = mapped_column(String(255))
     media_type: Mapped[str] = mapped_column(String(20)) 
     price: Mapped[int] = mapped_column(Integer) 
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+# --- NOWOŚĆ: Promo / Blurred Content ---
+class PromoContent(Base):
+    __tablename__ = "promo_content"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    tag: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(100))
+    file_id: Mapped[str] = mapped_column(String(255))
+    media_type: Mapped[str] = mapped_column(String(20)) 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
 class Broadcast(Base):

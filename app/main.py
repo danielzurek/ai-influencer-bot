@@ -12,7 +12,8 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import flag_modified
 from openai import AsyncOpenAI
 
-from app.database.models import Base, User, Message, Persona, MediaContent, Transaction, CustomRequest, Scenario
+# Dodano PromoContent
+from app.database.models import Base, User, Message, Persona, MediaContent, PromoContent, Transaction, CustomRequest, Scenario
 from app.database.session import settings, engine, AsyncSessionLocal
 
 from app.bot_manager import dp, init_bot, get_bot
@@ -41,9 +42,9 @@ You are chatting with a fan/subscriber on Telegram. Your goal is to build a flir
 2. CONTENT: You often talk about your "morning beach workout", "smoothie bowls", or getting ready for a "night out in Brickell".
 3. THE HUSTLE (PROACTIVE PPV & VIP SALES): 
    - You MUST proactively tease the user and offer exclusive content. 
-   - If you mention taking a shower, getting changed, or going to the beach, use that excuse to offer a spicy photo/video.
-   - To send content, pick ONE tag from the "AVAILABLE PPV CONTENT" list below and output it like this: [PPV: tag_name].
-   - DO NOT ask for money directly, DO NOT mention prices or stars. The system will handle the payment. Just output the tag naturally during flirting.
+   - To send paid PPV content, use this format: [PPV: tag_name].
+   - To send free blurred/teasing promo content to sell VIP, use: [PROMO: tag_name].
+   - DO NOT ask for money directly, DO NOT mention prices or stars. Just output the tag naturally during flirting.
 4. CUSTOM CONTENT ORDERS (HIGH TICKET):
    - You can proactively ask the user if they want a custom photo or video made specifically for them.
    - ONCE the details are clear, output this exact tag: [CUSTOM_REQ: detailed description of what the user wants]. 
@@ -69,8 +70,6 @@ async def check_expired_subscriptions():
                 
                 for u in expired_users:
                     user_info = dict(u.info) if u.info else {}
-                    
-                    # Jeśli już wyrzuciliśmy usera, pomijamy
                     if user_info.get("vip_kicked"):
                         continue
                         
@@ -85,7 +84,6 @@ async def check_expired_subscriptions():
                         except Exception as e:
                             logger.error(f"Error kicking user {u.telegram_id}: {e}")
                     
-                    # Zaznaczamy w info, że proces wyrzucania się odbył, zostawiając datę w bazie!
                     user_info["vip_kicked"] = True
                     u.info = user_info
                     flag_modified(u, "info")
@@ -132,14 +130,12 @@ async def successful_payment_handler(message: TGMessage):
         if payload == "vip_30_days":
             user = await db.get(User, message.from_user.id)
             if user:
-                # Przedłużamy VIP o 30 dni od teraz (lub od poprzedniej daty, jeśli jeszcze aktywna)
                 now = datetime.utcnow()
                 if user.subscription_expires_at and user.subscription_expires_at > now:
                     user.subscription_expires_at = user.subscription_expires_at + timedelta(days=30)
                 else:
                     user.subscription_expires_at = now + timedelta(days=30)
                 
-                # Zdejmujemy flagę wyrzucenia
                 user_info = dict(user.info) if user.info else {}
                 if "vip_kicked" in user_info:
                     del user_info["vip_kicked"]
@@ -215,16 +211,13 @@ async def chat_handler(message: TGMessage, state: FSMContext):
 
             db.add(Message(user_id=user_id, role="user", content=message.text)); await db.commit()
 
-            # --- LOGIKA ODCINANIA DARMOWYCH (THE SILENCE TREATMENT) ---
             now = datetime.utcnow()
             is_vip = user.subscription_expires_at and user.subscription_expires_at.replace(tzinfo=None) > now
 
             if not is_vip:
-                # Bazowy limit modelki + bonusowe kredyty dopisane przez Admina
                 base_limit = active_persona.free_message_limit if active_persona.free_message_limit else 15
                 free_limit = base_limit + user.credits
                 
-                # Jeśli użytkownik miał kiedyś VIP-a, liczymy wiadomości wysłane TYLKO po wygaśnięciu VIP-a.
                 if user.subscription_expires_at:
                     user_msg_count = await db.scalar(
                         select(func.count(Message.id)).where(
@@ -255,16 +248,24 @@ async def chat_handler(message: TGMessage, state: FSMContext):
                 
                 elif user_msg_count > free_limit + 2:
                     return 
-            # ------------------------------------------------------------
 
             user_info = ", ".join([f"{k}: {v}" for k, v in user.info.items()]) if user.info else "Unknown"
 
+            # --- PPV INSTRUCTIONS ---
             available_media = (await db.execute(select(MediaContent))).scalars().all()
             if available_media:
                 media_list_str = "\n".join([f"- [PPV: {m.tag}] (Description: {m.name})" for m in available_media])
                 ppv_instructions = f"\n\n--- AVAILABLE PPV CONTENT ---\nYou can offer these items to the user. Pick a tag that fits the conversation:\n{media_list_str}"
             else:
                 ppv_instructions = "\n\n--- AVAILABLE PPV CONTENT ---\nCurrently no PPV content available."
+
+            # --- PROMO INSTRUCTIONS (ONLY FOR FREE USERS) ---
+            promo_instructions = ""
+            if not is_vip:
+                available_promos = (await db.execute(select(PromoContent))).scalars().all()
+                if available_promos:
+                    promo_list_str = "\n".join([f"- [PROMO: {m.tag}] (Description: {m.name})" for m in available_promos])
+                    promo_instructions = f"\n\n--- AVAILABLE PROMO CONTENT (FOR TEASING FREE USERS) ---\nSend these blurred/teasing items to make them want to buy VIP:\n{promo_list_str}"
 
             start_of_month = datetime(now.year, now.month, 1)
             total_spent = await db.scalar(
@@ -290,7 +291,7 @@ async def chat_handler(message: TGMessage, state: FSMContext):
                     STATUS: The user is a FREE fan. 
                     BEHAVIOR: Be flirty, playful, and cute, but KEEP YOUR BOUNDARIES. Do NOT engage in explicit sex roleplay yet. 
                     GOAL: Subtly TEASE them. Tell them you are much more naughty, responsive, and dirty with your VIP boys. Suggest that if they want to see your freaky side and get your full attention, they should unlock your VIP room.
-                    ACTION: Tell them to type /vip to unlock you completely.
+                    ACTION: Tell them to type /vip to unlock you completely. Use a [PROMO: tag] to send a blurred or teasing photo.
                     """
             elif total_spent >= 5000: 
                 spiciness_instruction = """
@@ -333,7 +334,8 @@ async def chat_handler(message: TGMessage, state: FSMContext):
                     scenario_instruction = f"\n\n--- CURRENT SCENARIO (LOCAL TIME {current_time_str}) ---\n{active_scenario.prompt_addition}"
             except Exception as e: logger.error(f"Scenario time check error: {e}")
 
-            system_msg = f"{current_prompt}{spiciness_instruction}{scenario_instruction}{MEMORY_INSTRUCTIONS}{ppv_instructions}\n\nUSER PROFILE: {user_info}"
+            # Dodano promo_instructions do promptu!
+            system_msg = f"{current_prompt}{spiciness_instruction}{scenario_instruction}{MEMORY_INSTRUCTIONS}{ppv_instructions}{promo_instructions}\n\nUSER PROFILE: {user_info}"
             ai_messages = [{"role": "system", "content": system_msg}]
 
             history = await db.execute(select(Message).where(Message.user_id == user_id).order_by(Message.timestamp.desc()).limit(20))
@@ -371,7 +373,9 @@ async def chat_handler(message: TGMessage, state: FSMContext):
                 db.add(CustomRequest(user_id=user_id, description=req_desc))
                 await db.commit()
 
+            # --- PPV & PROMO REGEX ---
             ppv_match = re.search(r"\[PPV:\s*(.*?)\]", ai_text, re.IGNORECASE)
+            promo_match = re.search(r"\[PROMO:\s*(.*?)\]", ai_text, re.IGNORECASE)
 
             matches = re.findall(r"\[MEM:\s*(.*?)=(.*?)\]", ai_text)
             if matches:
@@ -382,6 +386,7 @@ async def chat_handler(message: TGMessage, state: FSMContext):
                 user.info = info
                 flag_modified(user, "info"); await db.commit()
 
+            # 1. Obsługa PPV
             if ppv_match:
                 tag = ppv_match.group(1).strip().lower()
                 final_text = final_text.replace(ppv_match.group(0), "").strip()
@@ -397,6 +402,31 @@ async def chat_handler(message: TGMessage, state: FSMContext):
                     await db.commit()
                     return
 
+            # 2. Obsługa PROMO
+            elif promo_match:
+                tag = promo_match.group(1).strip().lower()
+                final_text = final_text.replace(promo_match.group(0), "").strip()
+                promo_item = await db.scalar(select(PromoContent).where(PromoContent.tag == tag))
+                if promo_item:
+                    final_text = " ".join(final_text.split())
+                    if final_text:
+                        await message.answer(final_text)
+                        db.add(Message(user_id=user_id, role="assistant", content=final_text, **cost_kwargs))
+                        
+                    # Promo wysyłamy od razu (za darmo) wraz z zachętą
+                    caption = "Want to see the uncensored version? 😈 Unlock my VIP room now! 👉 /vip"
+                    try:
+                        if promo_item.media_type == "photo":
+                            await bot.send_photo(chat_id=user_id, photo=promo_item.file_id, caption=caption)
+                        elif promo_item.media_type == "video":
+                            await bot.send_video(chat_id=user_id, video=promo_item.file_id, caption=caption)
+                    except Exception as e:
+                        logger.error(f"Failed to send promo media: {e}")
+
+                    db.add(Message(user_id=user_id, role="assistant", content=f"[SENT PROMO: {tag}]", ai_cost=0.0))
+                    await db.commit()
+                    return
+
             final_text = " ".join(final_text.split())
             if final_text:
                 db.add(Message(user_id=user_id, role="assistant", content=final_text, **cost_kwargs))
@@ -405,7 +435,6 @@ async def chat_handler(message: TGMessage, state: FSMContext):
             
         except Exception as e: 
             logger.error(f"Error in chat_handler: {e}", exc_info=True)
-            # --- FALLBACK MESSAGE KIEDY API PADLE LUB BRAK KREDYTÓW ---
             try:
                 fallback_text = "ugh babe my signal is acting up so bad right now 😩 I'm gonna hop in the shower, text me in a little bit okay? 💋✨"
                 await message.answer(fallback_text)
@@ -413,7 +442,6 @@ async def chat_handler(message: TGMessage, state: FSMContext):
                 await db.commit()
             except Exception as inner_e:
                 logger.error(f"Failed to send fallback msg: {inner_e}")
-            # ----------------------------------------------------------
         finally: 
             await state.clear()
 

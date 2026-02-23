@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4 mb-4">
+        <div class="card shadow-sm" style="border-color: #e0e0e0;">
+            <div class="card-header bg-light text-dark fw-bold">Create Promo Teaser</div>
+            <div class="card-body">
+                <form action="/admin/promo/create" method="post">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-uppercase">Tag (for AI)</label>
+                        <input type="text" name="tag" class="form-control font-monospace" placeholder="blurred_shower" required>
+                        <div class="form-text text-muted">AI triggers this using <code>[PROMO: tag]</code></div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-uppercase">Display Name</label>
+                        <input type="text" name="name" class="form-control" placeholder="Blurred Shower Pic 🚿" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-uppercase">File ID</label>
+                        <input type="text" name="file_id" class="form-control font-monospace" placeholder="AgAC..." required>
+                        <div class="form-text text-muted">Send blurred media to @RawDataBot to get File ID.</div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label small fw-bold text-uppercase">Type</label>
+                        <select name="media_type" class="form-select">
+                            <option value="photo">Photo</option>
+                            <option value="video">Video</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-light border-dark w-100 fw-bold">Add Promo</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-header border-bottom border-secondary">Active Promo / Teasers</div>
+            <div class="card-body p-0">
+                <table class="table table-dark table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-3">Content Info</th>
+                            <th>Tag</th>
+                            <th class="text-end pe-3">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in promo_items %}
+                        <tr>
+                            <td class="ps-3">
+                                <span class="fw-bold">{{ item.name }}</span><br>
+                                <small class="text-muted">{{ item.media_type.upper() }} • ID: {{ item.file_id[:10] }}...</small>
+                            </td>
+                            <td><code class="text-light bg-dark px-2 py-1 rounded">[PROMO: {{ item.tag }}]</code></td>
+                            <td class="text-end pe-3">
+                                <form action="/admin/promo/{{ item.id }}/delete" method="post" onsubmit="return confirm('Delete this promo item?');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Del</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="text-center py-4 text-muted">No Promo content added yet. Add some blurred pictures to drive sales!</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

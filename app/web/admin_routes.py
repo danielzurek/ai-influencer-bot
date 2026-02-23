@@ -13,7 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from aiogram.types import LabeledPrice
 
-from app.database.models import User, Message, Persona, Group, Broadcast, BroadcastLog, MediaContent, CustomRequest, Transaction, Scenario
+# Dodano PromoContent
+from app.database.models import User, Message, Persona, Group, Broadcast, BroadcastLog, MediaContent, PromoContent, CustomRequest, Transaction, Scenario
 from app.database.session import get_db, settings, AsyncSessionLocal 
 from app.bot_manager import init_bot, get_bot
 
@@ -307,6 +308,24 @@ async def delete_media(media_id: int, db: AsyncSession = Depends(get_db), user=D
     if item: await db.delete(item); await db.commit()
     return RedirectResponse(url="/admin/media", status_code=303)
 
+# --- PROMO CONTENT ---
+@router.get("/promo", response_class=HTMLResponse)
+async def promo_list(request: Request, db: AsyncSession = Depends(get_db), user=Depends(auth)):
+    promo_items = (await db.execute(select(PromoContent).order_by(desc(PromoContent.created_at)))).scalars().all()
+    return templates.TemplateResponse("promo.html", {"request": request, "promo_items": promo_items, "username": user})
+
+@router.post("/promo/create")
+async def create_promo(tag: str = Form(...), name: str = Form(...), file_id: str = Form(...), media_type: str = Form(...), db: AsyncSession = Depends(get_db), user=Depends(auth)):
+    db.add(PromoContent(tag=tag.strip().lower().replace(" ", "_"), name=name, file_id=file_id.strip(), media_type=media_type))
+    await db.commit()
+    return RedirectResponse(url="/admin/promo", status_code=303)
+
+@router.post("/promo/{promo_id}/delete")
+async def delete_promo(promo_id: int, db: AsyncSession = Depends(get_db), user=Depends(auth)):
+    item = await db.get(PromoContent, promo_id)
+    if item: await db.delete(item); await db.commit()
+    return RedirectResponse(url="/admin/promo", status_code=303)
+
 @router.get("/customs", response_class=HTMLResponse)
 async def customs_list(request: Request, db: AsyncSession = Depends(get_db), user=Depends(auth)):
     orders = (await db.execute(select(CustomRequest).options(selectinload(CustomRequest.user)).order_by(case((CustomRequest.status == 'pending', 1), else_=2), desc(CustomRequest.created_at)))).scalars().all()
@@ -332,12 +351,10 @@ async def reject_custom_request(req_id: int, db: AsyncSession = Depends(get_db),
 @router.get("/expired_vips", response_class=HTMLResponse)
 async def expired_vips_list(request: Request, db: AsyncSession = Depends(get_db), user=Depends(auth)):
     now = datetime.utcnow()
-    # Pobieramy użytkowników, których data wygaśnięcia jest w przeszłości
     expired_users = (await db.execute(
         select(User).where(User.subscription_expires_at < now).order_by(desc(User.subscription_expires_at))
     )).scalars().all()
     
-    # Obliczamy w pythonie ilość dni od wygaśnięcia dla wygody szablonu
     for u in expired_users:
         u.days_expired = (now - u.subscription_expires_at.replace(tzinfo=None)).days
         
