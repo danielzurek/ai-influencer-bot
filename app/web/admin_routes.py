@@ -59,6 +59,14 @@ async def chat_viewer(request: Request, user_id: int, db: AsyncSession = Depends
     msgs = (await db.execute(select(Message).where(Message.user_id == user_id).order_by(Message.timestamp))).scalars().all()
     return templates.TemplateResponse("chat_viewer.html", {"request": request, "chat_user": chat_user, "messages": msgs, "username": user})
 
+@router.post("/users/{user_id}/add_credits")
+async def add_user_credits(user_id: int, amount: int = Form(...), db: AsyncSession = Depends(get_db), user=Depends(auth)):
+    target_user = await db.get(User, user_id)
+    if target_user:
+        target_user.credits += amount
+        await db.commit()
+    return RedirectResponse(url=f"/admin/chat/{user_id}", status_code=303)
+
 # --- GROUPS ---
 @router.get("/groups", response_class=HTMLResponse)
 async def list_groups(request: Request, db: AsyncSession = Depends(get_db), user=Depends(auth)):

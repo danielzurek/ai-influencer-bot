@@ -220,10 +220,11 @@ async def chat_handler(message: TGMessage, state: FSMContext):
             is_vip = user.subscription_expires_at and user.subscription_expires_at.replace(tzinfo=None) > now
 
             if not is_vip:
-                free_limit = active_persona.free_message_limit if active_persona.free_message_limit else 15
+                # Bazowy limit modelki + bonusowe kredyty dopisane przez Admina
+                base_limit = active_persona.free_message_limit if active_persona.free_message_limit else 15
+                free_limit = base_limit + user.credits
                 
                 # Jeśli użytkownik miał kiedyś VIP-a, liczymy wiadomości wysłane TYLKO po wygaśnięciu VIP-a.
-                # W ten sposób po wygaśnięciu dostaje znów pulę 'free_limit' wiadomości.
                 if user.subscription_expires_at:
                     user_msg_count = await db.scalar(
                         select(func.count(Message.id)).where(
