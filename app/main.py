@@ -1,4 +1,4 @@
-import logging, sys, re, asyncio
+import logging, sys, re, asyncio, random
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from contextlib import asynccontextmanager
@@ -431,6 +431,51 @@ async def chat_handler(message: TGMessage, state: FSMContext):
             if final_text:
                 db.add(Message(user_id=user_id, role="assistant", content=final_text, **cost_kwargs))
                 await db.commit()
+                
+                # --- HUMANIZATION: DYNAMIC & TIER-BASED DELAY ---
+                word_count = len(final_text.split())
+                
+                # Ustalanie mnożników i bazowych czasów w zależności od statusu usera (Pikanterii)
+                if total_spent >= 5000:
+                    # WHALE (Spiciness 3) - obsesyjna, rzuca wszystko, żeby odpisać
+                    base_delay = random.uniform(0.5, 1.5)
+                    typing_time = word_count * random.uniform(0.05, 0.1)
+                    total_delay = min(base_delay + typing_time, 5.0) # Max 5 sekund czekania
+                    
+                elif is_vip:
+                    # VIP (Spiciness 2) - zaangażowana, naturalny ludzki czas
+                    base_delay = random.uniform(1.5, 3.0)
+                    typing_time = word_count * random.uniform(0.1, 0.2)
+                    total_delay = min(base_delay + typing_time, 10.0) # Max 10 sekund czekania
+                    
+                else:
+                    # FREE (Spiciness 1 / 1.5) - teasing, udaje zajętą i "ghostuje"
+                    typing_time = word_count * random.uniform(0.1, 0.2)
+                    
+                    # 20% szans na to, że zostawi usera na "Odczytano" i odpisze po 1 do 3 minut!
+                    if random.random() < 0.20:
+                        base_delay = random.uniform(60.0, 180.0) 
+                        total_delay = base_delay + typing_time
+                    else:
+                        base_delay = random.uniform(2.0, 5.0)
+                        total_delay = min(base_delay + typing_time, 12.0)
+
+                # Logika realistycznego wyświetlania statusu "pisze..."
+                if total_delay > 15.0:
+                    # Jeśli czeka długo (np. 2 minuty), najpierw "milczy", 
+                    # a status "pisze..." włączy dopiero na ostatnie 5-8 sekund
+                    typing_duration = min(typing_time + 2.0, 8.0)
+                    silent_wait = total_delay - typing_duration
+                    
+                    await asyncio.sleep(silent_wait) # Czeka w ciszy
+                    await bot.send_chat_action(chat_id=user_id, action="typing")
+                    await asyncio.sleep(typing_duration) # Faktyczne "pisanie"
+                else:
+                    # Krótki czas - od razu pokazuje, że pisze
+                    await bot.send_chat_action(chat_id=user_id, action="typing")
+                    await asyncio.sleep(total_delay)
+                # -----------------------------------
+                
                 await message.answer(final_text)
             
         except Exception as e: 
@@ -464,5 +509,10 @@ app.include_router(admin_router, prefix="/admin")
 @app.post("/webhook")
 async def webhook(request: Request):
     bot_instance = await get_bot()
-    if bot_instance: await dp.feed_update(bot=bot_instance, update=types.Update(**await request.json()))
+    if bot_instance: 
+        update = types.Update(**await request.json())
+        # Puszczamy przetwarzanie wiadomości w tle!
+        # Dzięki temu natychmiast zwracamy "ok: True" do Telegrama
+        # i serwer nigdy nie zerwie połączenia podczas długiego czekania.
+        asyncio.create_task(dp.feed_update(bot=bot_instance, update=update))
     return {"ok": True}
