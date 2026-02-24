@@ -28,6 +28,13 @@ class User(Base):
     subscription_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     credits: Mapped[int] = mapped_column(default=10)
     info: Mapped[dict] = mapped_column(JSON, default={})
+    
+    # --- NOWE POLA DO LIMITÓW ---
+    vip_messages_used_today: Mapped[int] = mapped_column(Integer, default=0)
+    last_message_date: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    bonus_credits: Mapped[int] = mapped_column(Integer, default=0)
+    # ----------------------------
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     
     messages: Mapped[List["Message"]] = relationship("Message", back_populates="user")
@@ -75,6 +82,12 @@ class Persona(Base):
     private_channel_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     vip_subscription_price: Mapped[int] = mapped_column(Integer, default=500)
     free_message_limit: Mapped[int] = mapped_column(Integer, default=15)
+    
+    # --- NOWE POLA DO LIMITÓW ---
+    vip_daily_limit: Mapped[int] = mapped_column(Integer, default=50)
+    ppv_multiplier: Mapped[int] = mapped_column(Integer, default=10)
+    # ----------------------------
+
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     scenarios: Mapped[List["Scenario"]] = relationship("Scenario", back_populates="persona", cascade="all, delete-orphan")
@@ -102,7 +115,6 @@ class MediaContent(Base):
     price: Mapped[int] = mapped_column(Integer) 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
-# --- NOWOŚĆ: Promo / Blurred Content ---
 class PromoContent(Base):
     __tablename__ = "promo_content"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)

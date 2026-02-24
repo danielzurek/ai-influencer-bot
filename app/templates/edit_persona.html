@@ -75,6 +75,18 @@
                         </div>
                     </div>
 
+                    <div class="row border-top border-secondary pt-3 mt-3 mb-3">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label small text-uppercase fw-bold text-warning">VIP Daily Limit</label>
+                            <input type="number" name="vip_daily_limit" class="form-control bg-dark text-light border-warning" value="{{ persona.vip_daily_limit|default(50) }}" required>
+                            <small class="text-muted">Max messages VIP user can send per day.</small>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label small text-uppercase fw-bold text-info">PPV Multiplier (Msg per $1)</label>
+                            <input type="number" name="ppv_multiplier" class="form-control bg-dark text-light border-info" value="{{ persona.ppv_multiplier|default(10) }}" required>
+                            <small class="text-muted">Bonus msgs given for every $1 spent on PPV.</small>
+                        </div>
+                    </div>
                     <div class="mb-3">
                         <label class="form-label small text-uppercase fw-bold">System Prompt</label>
                         <textarea name="system_prompt" class="form-control bg-dark text-light border-secondary font-monospace" rows="12" required>{{ persona.system_prompt }}</textarea>

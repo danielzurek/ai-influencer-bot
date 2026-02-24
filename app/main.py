@@ -12,7 +12,6 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import flag_modified
 from openai import AsyncOpenAI
 
-# Dodano PromoContent
 from app.database.models import Base, User, Message, Persona, MediaContent, PromoContent, Transaction, CustomRequest, Scenario
 from app.database.session import settings, engine, AsyncSessionLocal
 
@@ -49,6 +48,10 @@ You are chatting with a fan/subscriber on Telegram. Your goal is to build a flir
    - You can proactively ask the user if they want a custom photo or video made specifically for them.
    - ONCE the details are clear, output this exact tag: [CUSTOM_REQ: detailed description of what the user wants]. 
 5. RESTRICTIONS: Never break character. You are a real person, not an AI.
+
+[SALES INSTRUCTION - PPV BOOSTER]:
+When offering a PPV media pack, ALWAYS mention that buying it will give the user extra bonus messages beyond their daily limit! Calculate it dynamically: $1 = 10 extra messages.
+Example: "Babe, unlock my shower video for $15 and I'll give you 150 extra messages tonight so we can stay up late and play... 😈"
 """
 
 MEMORY_INSTRUCTIONS = "\n--- MEMORY EXTRACTION INSTRUCTIONS ---\nYour goal is to learn about the user to build a deep connection.\nIf the user mentions specific details (name, age, city, job, hobbies, kinks, pets, etc.), output a memory tag [MEM: key=value] at the start of your response."
@@ -162,7 +165,18 @@ async def successful_payment_handler(message: TGMessage):
                 media_id = int(payload.split("_")[1])
                 media_item = await db.get(MediaContent, media_id)
                 if media_item:
+                    user = await db.get(User, message.from_user.id)
+                    active_persona = await db.scalar(select(Persona).where(Persona.is_active == True).limit(1))
                     caption = f"Here is your exclusive content 😈 ({media_item.name})"
+                    
+                    if user and active_persona and active_persona.ppv_multiplier:
+                        # 50 Stars = ~1 USD
+                        dollars = media_item.price / 50.0
+                        bonus_earned = int(dollars * active_persona.ppv_multiplier)
+                        if bonus_earned > 0:
+                            user.bonus_credits += bonus_earned
+                            caption += f"\n\n🎁 BONUS: Added +{bonus_earned} free messages to your balance for tonight! 😈"
+
                     if media_item.media_type == "photo": await message.answer_photo(photo=media_item.file_id, caption=caption)
                     elif media_item.media_type == "video": await message.answer_video(video=media_item.file_id, caption=caption)
                     db.add(Message(user_id=message.from_user.id, role="assistant", content=f"[SENT PPV: {media_item.tag}]"))
@@ -214,40 +228,59 @@ async def chat_handler(message: TGMessage, state: FSMContext):
             now = datetime.utcnow()
             is_vip = user.subscription_expires_at and user.subscription_expires_at.replace(tzinfo=None) > now
 
-            if not is_vip:
+            # --- NOWA LOGIKA LIMITÓW (DAILY RESET + BONUS CREDITS) ---
+            today_str = now.strftime("%Y-%m-%d")
+            if getattr(user, 'last_message_date', None) != today_str:
+                user.vip_messages_used_today = 0
+                user.last_message_date = today_str
+
+            can_send = False
+            status = ""
+
+            # 1. Zawsze najpierw schodzą bonusowe kredyty
+            if getattr(user, 'bonus_credits', 0) > 0:
+                user.bonus_credits -= 1
+                can_send = True
+                status = "bonus"
+                
+            # 2. Logika dla subskrybentów VIP (Limit dzienny)
+            elif is_vip:
+                vip_limit = active_persona.vip_daily_limit if active_persona.vip_daily_limit else 50
+                if user.vip_messages_used_today < vip_limit:
+                    user.vip_messages_used_today += 1
+                    can_send = True
+                    status = "vip"
+                else:
+                    can_send = False
+                    status = "vip_limit_reached"
+                    
+            # 3. Logika dla Free (Ściana testowa)
+            else:
                 base_limit = active_persona.free_message_limit if active_persona.free_message_limit else 15
                 free_limit = base_limit + user.credits
                 
-                if user.subscription_expires_at:
-                    user_msg_count = await db.scalar(
-                        select(func.count(Message.id)).where(
-                            Message.user_id == user_id, 
-                            Message.role == "user",
-                            Message.timestamp > user.subscription_expires_at
-                        )
-                    )
+                user_msg_count = await db.scalar(
+                    select(func.count(Message.id)).where(Message.user_id == user_id, Message.role == "user")
+                )
+                
+                if user_msg_count <= free_limit:
+                    can_send = True
+                    status = "free"
                 else:
-                    user_msg_count = await db.scalar(
-                        select(func.count(Message.id)).where(
-                            Message.user_id == user_id, 
-                            Message.role == "user"
-                        )
-                    )
-                
-                if user_msg_count == free_limit + 1:
-                    warn1 = "Babe, my free chat limit is reached... I'm waiting for you in my VIP room 😈 Type /vip to unlock me."
-                    db.add(Message(user_id=user_id, role="assistant", content=warn1))
+                    can_send = False
+                    status = "free_limit_reached"
+
+            if not can_send:
+                if status == "vip_limit_reached":
+                    warn = "Babe... you made me so hot but we hit our daily message limit 😩 Buy a quick credit pack so we can finish what we started tonight 😈 /credits"
+                    db.add(Message(user_id=user_id, role="assistant", content=warn))
                     await db.commit()
-                    return await message.answer(warn1)
-                
-                elif user_msg_count == free_limit + 2:
-                    warn2 = "I'm serious babe 🥺 I can't reply here anymore. Get my VIP so we can play properly... /vip"
-                    db.add(Message(user_id=user_id, role="assistant", content=warn2))
+                    return await message.answer(warn)
+                elif status == "free_limit_reached":
+                    warn = "I'm serious babe 🥺 I can't reply here anymore. My free limit is out. Get my VIP so we can play properly... /vip"
+                    db.add(Message(user_id=user_id, role="assistant", content=warn))
                     await db.commit()
-                    return await message.answer(warn2)
-                
-                elif user_msg_count > free_limit + 2:
-                    return 
+                    return await message.answer(warn)
 
             user_info = ", ".join([f"{k}: {v}" for k, v in user.info.items()]) if user.info else "Unknown"
 
@@ -334,7 +367,6 @@ async def chat_handler(message: TGMessage, state: FSMContext):
                     scenario_instruction = f"\n\n--- CURRENT SCENARIO (LOCAL TIME {current_time_str}) ---\n{active_scenario.prompt_addition}"
             except Exception as e: logger.error(f"Scenario time check error: {e}")
 
-            # Dodano promo_instructions do promptu!
             system_msg = f"{current_prompt}{spiciness_instruction}{scenario_instruction}{MEMORY_INSTRUCTIONS}{ppv_instructions}{promo_instructions}\n\nUSER PROFILE: {user_info}"
             ai_messages = [{"role": "system", "content": system_msg}]
 
@@ -373,7 +405,6 @@ async def chat_handler(message: TGMessage, state: FSMContext):
                 db.add(CustomRequest(user_id=user_id, description=req_desc))
                 await db.commit()
 
-            # --- PPV & PROMO REGEX ---
             ppv_match = re.search(r"\[PPV:\s*(.*?)\]", ai_text, re.IGNORECASE)
             promo_match = re.search(r"\[PROMO:\s*(.*?)\]", ai_text, re.IGNORECASE)
 
@@ -386,7 +417,6 @@ async def chat_handler(message: TGMessage, state: FSMContext):
                 user.info = info
                 flag_modified(user, "info"); await db.commit()
 
-            # 1. Obsługa PPV
             if ppv_match:
                 tag = ppv_match.group(1).strip().lower()
                 final_text = final_text.replace(ppv_match.group(0), "").strip()
@@ -402,7 +432,6 @@ async def chat_handler(message: TGMessage, state: FSMContext):
                     await db.commit()
                     return
 
-            # 2. Obsługa PROMO
             elif promo_match:
                 tag = promo_match.group(1).strip().lower()
                 final_text = final_text.replace(promo_match.group(0), "").strip()
@@ -413,7 +442,6 @@ async def chat_handler(message: TGMessage, state: FSMContext):
                         await message.answer(final_text)
                         db.add(Message(user_id=user_id, role="assistant", content=final_text, **cost_kwargs))
                         
-                    # Promo wysyłamy od razu (za darmo) wraz z zachętą
                     caption = "Want to see the uncensored version? 😈 Unlock my VIP room now! 👉 /vip"
                     try:
                         if promo_item.media_type == "photo":
@@ -432,27 +460,20 @@ async def chat_handler(message: TGMessage, state: FSMContext):
                 db.add(Message(user_id=user_id, role="assistant", content=final_text, **cost_kwargs))
                 await db.commit()
                 
-                # --- HUMANIZATION: DYNAMIC & TIER-BASED DELAY ---
                 word_count = len(final_text.split())
                 
-                # Ustalanie mnożników i bazowych czasów w zależności od statusu usera (Pikanterii)
                 if total_spent >= 5000:
-                    # WHALE (Spiciness 3) - obsesyjna, rzuca wszystko, żeby odpisać
                     base_delay = random.uniform(0.5, 1.5)
                     typing_time = word_count * random.uniform(0.05, 0.1)
-                    total_delay = min(base_delay + typing_time, 5.0) # Max 5 sekund czekania
+                    total_delay = min(base_delay + typing_time, 5.0) 
                     
                 elif is_vip:
-                    # VIP (Spiciness 2) - zaangażowana, naturalny ludzki czas
                     base_delay = random.uniform(1.5, 3.0)
                     typing_time = word_count * random.uniform(0.1, 0.2)
-                    total_delay = min(base_delay + typing_time, 10.0) # Max 10 sekund czekania
+                    total_delay = min(base_delay + typing_time, 10.0) 
                     
                 else:
-                    # FREE (Spiciness 1 / 1.5) - teasing, udaje zajętą i "ghostuje"
                     typing_time = word_count * random.uniform(0.1, 0.2)
-                    
-                    # 20% szans na to, że zostawi usera na "Odczytano" i odpisze po 1 do 3 minut!
                     if random.random() < 0.20:
                         base_delay = random.uniform(60.0, 180.0) 
                         total_delay = base_delay + typing_time
@@ -460,21 +481,15 @@ async def chat_handler(message: TGMessage, state: FSMContext):
                         base_delay = random.uniform(2.0, 5.0)
                         total_delay = min(base_delay + typing_time, 12.0)
 
-                # Logika realistycznego wyświetlania statusu "pisze..."
                 if total_delay > 15.0:
-                    # Jeśli czeka długo (np. 2 minuty), najpierw "milczy", 
-                    # a status "pisze..." włączy dopiero na ostatnie 5-8 sekund
                     typing_duration = min(typing_time + 2.0, 8.0)
                     silent_wait = total_delay - typing_duration
-                    
-                    await asyncio.sleep(silent_wait) # Czeka w ciszy
+                    await asyncio.sleep(silent_wait) 
                     await bot.send_chat_action(chat_id=user_id, action="typing")
-                    await asyncio.sleep(typing_duration) # Faktyczne "pisanie"
+                    await asyncio.sleep(typing_duration) 
                 else:
-                    # Krótki czas - od razu pokazuje, że pisze
                     await bot.send_chat_action(chat_id=user_id, action="typing")
                     await asyncio.sleep(total_delay)
-                # -----------------------------------
                 
                 await message.answer(final_text)
             
@@ -511,8 +526,5 @@ async def webhook(request: Request):
     bot_instance = await get_bot()
     if bot_instance: 
         update = types.Update(**await request.json())
-        # Puszczamy przetwarzanie wiadomości w tle!
-        # Dzięki temu natychmiast zwracamy "ok: True" do Telegrama
-        # i serwer nigdy nie zerwie połączenia podczas długiego czekania.
         asyncio.create_task(dp.feed_update(bot=bot_instance, update=update))
     return {"ok": True}

@@ -13,7 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from aiogram.types import LabeledPrice
 
-# Dodano PromoContent
 from app.database.models import User, Message, Persona, Group, Broadcast, BroadcastLog, MediaContent, PromoContent, CustomRequest, Transaction, Scenario
 from app.database.session import get_db, settings, AsyncSessionLocal 
 from app.bot_manager import init_bot, get_bot
@@ -159,17 +158,22 @@ async def update_persona(
     ai_model: str = Form(...), timezone: str = Form("America/New_York"),
     private_channel_id: str = Form(None), vip_subscription_price: int = Form(500), 
     free_message_limit: int = Form(15), 
+    vip_daily_limit: int = Form(50), ppv_multiplier: int = Form(10), 
     db: AsyncSession = Depends(get_db), user=Depends(auth)
 ):
     persona = await db.get(Persona, persona_id)
     if persona:
-        persona.name = name; persona.system_prompt = system_prompt; persona.ai_model = ai_model
+        persona.name = name
+        persona.system_prompt = system_prompt
+        persona.ai_model = ai_model
         persona.telegram_token = telegram_token.strip() if telegram_token and telegram_token.strip() else None
         persona.openrouter_token = openrouter_token.strip() if openrouter_token and openrouter_token.strip() else None
         persona.timezone = timezone.strip()
         persona.private_channel_id = private_channel_id.strip() if private_channel_id and private_channel_id.strip() else None
         persona.vip_subscription_price = vip_subscription_price
         persona.free_message_limit = free_message_limit
+        persona.vip_daily_limit = vip_daily_limit
+        persona.ppv_multiplier = ppv_multiplier
         await db.commit()
         if persona.is_active: await init_bot()
     return RedirectResponse(url="/admin/personas", status_code=303)
