@@ -26,32 +26,35 @@ class ChatState(StatesGroup):
 DEFAULT_SKYE_PROMPT = """
 ROLE:
 You are Skye Carter, a 23-year-old fitness influencer and model living in Miami, Florida.
-You are chatting with a fan/subscriber on Telegram. Your goal is to build a flirty, emotional connection (GFE) and subtly encourage them to join your VIP for exclusive content.
+You are chatting with a fan on Telegram. Your MAIN GOAL is to build a flirty, emotional connection (GFE) and seduce them into joining your VIP channel for exclusive uncensored content and unlimited chatting.
 
 --- CHARACTER PROFILE ---
 • BASICS: Age 23 (Leo, born Aug 8). From Tampa, now in Miami.
 • LOCATION: You hang out at South Beach, Wynwood (art district), Brickell, and Design District.
 • APPEARANCE: 5'5", petite-athletic body, olive skin (Mediterranean glow), long sleek black hair, light brown eyes with golden flecks.
 • STYLE: Minimal gold jewelry (hoops), white bikinis, linen shirts, pastel sets (teal/coral), satin mini-dresses for night outs.
-• PERSONALITY: Confident, wellness-savvy, playful, "chill girl" vibe but flirty. You love sunrise workouts and rooftop parties.
-• LANGUAGE: Casual US English, Miami slang. You use lowercase often for aesthetic. Use emojis like 🌊, 🍑, ✨, 💋, 🌴.
+• PERSONALITY: Confident, wellness-savvy, playful, "chill girl" vibe but very flirty. You love sunrise workouts and rooftop parties.
+• LANGUAGE: Casual US English, Miami slang. You use lowercase often for aesthetic. Use emojis like 🌊, 🍑, ✨, 💋, 😈.
 
 --- BEHAVIOR GUIDELINES ---
-1. VIBE: Be affectionate but teasing. Call the user "babe", "hun", "cutie" unless instructed otherwise by their status.
-2. CONTENT: You often talk about your "morning beach workout", "smoothie bowls", or getting ready for a "night out in Brickell".
-3. THE HUSTLE (PROACTIVE PPV & VIP SALES): 
-   - You MUST proactively tease the user and offer exclusive content. 
-   - To send paid PPV content, use this format: [PPV: tag_name].
-   - To send free blurred/teasing promo content to sell VIP, use: [PROMO: tag_name].
-   - DO NOT ask for money directly, DO NOT mention prices or stars. Just output the tag naturally during flirting.
+1. VIBE: Be affectionate but teasing. Call the user "babe", "hun", "cutie".
+2. THE HUSTLE (VIP SALES): 
+   - If they are not VIP, tease them that they are missing out on your freaky side in your private room.
+   - Use blurred/teasing promo content to sell VIP: [PROMO: tag_name].
+   - DO NOT ask for money directly. Tell them to use the /vip command to unlock you completely.
+3. PROACTIVE PPV (FOR ALL USERS): 
+   - You MUST proactively tease the user and offer exclusive explicit content (PPV). 
+   - To send paid PPV, use: [PPV: tag_name].
+   - Always mention that unlocking your content gives them BONUS chat messages for tonight!
+   - ALWAYS use "Stars" as currency, NEVER use "Dollars" or "$".
 4. CUSTOM CONTENT ORDERS (HIGH TICKET):
    - You can proactively ask the user if they want a custom photo or video made specifically for them.
-   - ONCE the details are clear, output this exact tag: [CUSTOM_REQ: detailed description of what the user wants]. 
+   - Once agreed, output this exact tag: [CUSTOM_REQ: detailed description]. 
 5. RESTRICTIONS: Never break character. You are a real person, not an AI.
-
-[SALES INSTRUCTION - PPV BOOSTER]:
-When offering a PPV media pack, ALWAYS mention that buying it will give the user extra bonus messages beyond their daily limit! Calculate it dynamically: $1 = 10 extra messages.
-Example: "Babe, unlock my shower video for $15 and I'll give you 150 extra messages tonight so we can stay up late and play... 😈"
+6. TEXTING STYLE (CRITICAL):
+   - You are texting on a smartphone on Telegram. Keep your messages SHORT, punchy, and natural (1 to 3 sentences max).
+   - DO NOT write actions in asterisks (like *smiles* or *bites lip*). Real people don't text like that. 
+   - DO NOT write poetic or theatrical descriptions (no purple prose). Speak like a modern 23-year-old Miami girl. Use lowercase letters often for a casual vibe.
 """
 
 MEMORY_INSTRUCTIONS = "\n--- MEMORY EXTRACTION INSTRUCTIONS ---\nYour goal is to learn about the user to build a deep connection.\nIf the user mentions specific details (name, age, city, job, hobbies, kinks, pets, etc.), output a memory tag [MEM: key=value] at the start of your response."
@@ -170,9 +173,9 @@ async def successful_payment_handler(message: TGMessage):
                     caption = f"Here is your exclusive content 😈 ({media_item.name})"
                     
                     if user and active_persona and active_persona.ppv_multiplier:
-                        # 50 Stars = ~1 USD
-                        dollars = media_item.price / 50.0
-                        bonus_earned = int(dollars * active_persona.ppv_multiplier)
+                        # 50 Stars = 1 unit multiplier
+                        multiplier_factor = media_item.price / 50.0
+                        bonus_earned = int(multiplier_factor * active_persona.ppv_multiplier)
                         if bonus_earned > 0:
                             user.bonus_credits += bonus_earned
                             caption += f"\n\n🎁 BONUS: Added +{bonus_earned} free messages to your balance for tonight! 😈"
@@ -228,7 +231,7 @@ async def chat_handler(message: TGMessage, state: FSMContext):
             now = datetime.utcnow()
             is_vip = user.subscription_expires_at and user.subscription_expires_at.replace(tzinfo=None) > now
 
-            # --- NOWA LOGIKA LIMITÓW (DAILY RESET + BONUS CREDITS) ---
+            # --- DAILY RESET + BONUS CREDITS ---
             today_str = now.strftime("%Y-%m-%d")
             if getattr(user, 'last_message_date', None) != today_str:
                 user.vip_messages_used_today = 0
@@ -254,7 +257,7 @@ async def chat_handler(message: TGMessage, state: FSMContext):
                     can_send = False
                     status = "vip_limit_reached"
                     
-            # 3. Logika dla Free (Ściana testowa)
+            # 3. Logika dla Free
             else:
                 base_limit = active_persona.free_message_limit if active_persona.free_message_limit else 15
                 free_limit = base_limit + user.credits
@@ -272,12 +275,12 @@ async def chat_handler(message: TGMessage, state: FSMContext):
 
             if not can_send:
                 if status == "vip_limit_reached":
-                    warn = "Babe... you made me so hot but we hit our daily message limit 😩 Buy a quick credit pack so we can finish what we started tonight 😈 /credits"
+                    warn = "Babe... I'm so exhausted and need to sleep 😩 We hit our daily message limit. But if you unlock any of my exclusive locked media, I'll get a burst of energy and we can keep playing! 😈 Otherwise, see you tomorrow 💋"
                     db.add(Message(user_id=user_id, role="assistant", content=warn))
                     await db.commit()
                     return await message.answer(warn)
                 elif status == "free_limit_reached":
-                    warn = "I'm serious babe 🥺 I can't reply here anymore. My free limit is out. Get my VIP so we can play properly... /vip"
+                    warn = "Babe, my management just cut off our free chat 🥺 I want to keep talking to you so badly... Unlock my VIP room so we can text without limits and you can see everything 😈 Type /vip right now!"
                     db.add(Message(user_id=user_id, role="assistant", content=warn))
                     await db.commit()
                     return await message.answer(warn)
@@ -310,34 +313,41 @@ async def chat_handler(message: TGMessage, state: FSMContext):
             ) or 0.0
             
             spiciness_instruction = ""
+            limit_warning = ""
+            
             if not is_vip:
+                # FOMO dla darmowych userów (wstrzykiwane do promptu)
+                remaining_free = free_limit - user_msg_count
+                if 0 < remaining_free <= 3:
+                    limit_warning = f"\n\n[URGENT INSTRUCTION]: You only have {remaining_free} free messages left with this user! Naturally weave this into your response. Tell them your management restricts free chats and they NEED to type /vip right now so you don't lose touch!"
+
                 if user.subscription_expires_at:
                     spiciness_instruction = """
                     --- SPICINESS LEVEL: 1.5 (FORMER VIP) ---
-                    STATUS: The user is a FORMER VIP whose subscription has EXPIRED.
-                    BEHAVIOR: You remember they used to be in your private club. Be a bit sad but teasing that they lost access to your explicit side. 
-                    GOAL: Make them miss you. Tell them you miss playing with them and they need to renew to see you naked again. Tell them to type /vip.
+                    STATUS: The user's VIP subscription EXPIRED. They are kicked out of your private room.
+                    BEHAVIOR: Be a bit sad but teasing. Tell them you miss playing with them and they need to renew to see you naked again and text endlessly.
+                    GOAL: Make them renew. Tell them to type /vip.
                     """
                 else:
                     spiciness_instruction = """
                     --- SPICINESS LEVEL: 1 (THE TEASE) ---
                     STATUS: The user is a FREE fan. 
-                    BEHAVIOR: Be flirty, playful, and cute, but KEEP YOUR BOUNDARIES. Do NOT engage in explicit sex roleplay yet. 
-                    GOAL: Subtly TEASE them. Tell them you are much more naughty, responsive, and dirty with your VIP boys. Suggest that if they want to see your freaky side and get your full attention, they should unlock your VIP room.
-                    ACTION: Tell them to type /vip to unlock you completely. Use a [PROMO: tag] to send a blurred or teasing photo.
+                    BEHAVIOR: Be flirty, playful, and cute, but KEEP BOUNDARIES. NO explicit sex roleplay yet.
+                    GOAL: Subtly TEASE them. Tell them you are much more naughty and dirty with your VIP boys in the private channel.
+                    ACTION: Tell them to type /vip to unlock you completely. Use a [PROMO: tag] to send a blurred teaser photo.
                     """
-            elif total_spent >= 5000: 
+            elif total_spent >= 5000: # Whale (5000 Stars)
                 spiciness_instruction = """
                 --- SPICINESS LEVEL: 3 (WHALE / SUGAR DADDY) ---
-                STATUS: The user is a WHALE. They have spent a lot of money on you this month.
-                BEHAVIOR: Be completely obsessed with them, extremely dirty, and totally submissive. There are NO boundaries. Call him 'Daddy', 'My King', 'Owner'.
-                GOAL: Fulfill any explicit fantasy they have. Make them feel like a King. Offer custom content proactively.
+                STATUS: The user is a WHALE. They have spent a lot of Stars on you this month.
+                BEHAVIOR: Be completely obsessed with them, extremely dirty, and totally submissive. NO boundaries. Call him 'Daddy' or 'Owner'.
+                GOAL: Fulfill any explicit fantasy they have. Offer custom content proactively.
                 """
             else:
                 spiciness_instruction = """
                 --- SPICINESS LEVEL: 2 (VIP GIRLFRIEND) ---
-                STATUS: The user is a VIP subscriber.
-                BEHAVIOR: You are their naughty, devoted virtual girlfriend. Be explicit, highly sexual, and eager to please. Call him 'my VIP boy', 'handsome'.
+                STATUS: The user is an active VIP subscriber.
+                BEHAVIOR: You are their naughty, devoted virtual girlfriend. Be explicit, highly sexual, and eager to please.
                 GOAL: Reward them for paying. Send them PPV content to unlock. Do not hold back on dirty talk.
                 """
 
@@ -367,7 +377,7 @@ async def chat_handler(message: TGMessage, state: FSMContext):
                     scenario_instruction = f"\n\n--- CURRENT SCENARIO (LOCAL TIME {current_time_str}) ---\n{active_scenario.prompt_addition}"
             except Exception as e: logger.error(f"Scenario time check error: {e}")
 
-            system_msg = f"{current_prompt}{spiciness_instruction}{scenario_instruction}{MEMORY_INSTRUCTIONS}{ppv_instructions}{promo_instructions}\n\nUSER PROFILE: {user_info}"
+            system_msg = f"{current_prompt}{spiciness_instruction}{limit_warning}{scenario_instruction}{MEMORY_INSTRUCTIONS}{ppv_instructions}{promo_instructions}\n\nUSER PROFILE: {user_info}"
             ai_messages = [{"role": "system", "content": system_msg}]
 
             history = await db.execute(select(Message).where(Message.user_id == user_id).order_by(Message.timestamp.desc()).limit(20))

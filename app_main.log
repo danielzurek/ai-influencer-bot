@@ -247,3 +247,63 @@ aiogram.exceptions.TelegramBadRequest: Telegram server says - Bad Request: messa
 2026-02-21 10:20:38,774 - INFO - --- ALL MODELS INACTIVE: BOT OFFLINE ---
 2026-02-21 10:41:59,632 - INFO - --- ALL MODELS INACTIVE: BOT OFFLINE ---
 2026-02-21 10:43:14,522 - INFO - --- ALL MODELS INACTIVE: BOT OFFLINE ---
+2026-02-21 10:45:51,496 - INFO - --- ALL MODELS INACTIVE: BOT OFFLINE ---
+2026-02-23 09:22:10,543 - INFO - --- ALL MODELS INACTIVE: BOT OFFLINE ---
+2026-02-23 10:36:40,472 - INFO - --- ALL MODELS INACTIVE: BOT OFFLINE ---
+2026-02-23 10:56:05,936 - INFO - --- ALL MODELS INACTIVE: BOT OFFLINE ---
+2026-02-23 11:07:17,360 - INFO - --- ALL MODELS INACTIVE: BOT OFFLINE ---
+2026-02-23 11:37:25,567 - INFO - --- ALL MODELS INACTIVE: BOT OFFLINE ---
+2026-02-23 12:41:31,468 - INFO - --- ALL MODELS INACTIVE: BOT OFFLINE ---
+2026-02-23 12:42:08,315 - INFO - --- ALL MODELS INACTIVE: BOT OFFLINE ---
+2026-02-23 12:42:53,222 - INFO - --- ALL MODELS INACTIVE: BOT OFFLINE ---
+2026-02-23 12:58:05,213 - INFO - --- ALL MODELS INACTIVE: BOT OFFLINE ---
+2026-02-23 12:58:17,448 - INFO - --- ALL MODELS INACTIVE: BOT OFFLINE ---
+2026-02-23 12:59:57,613 - INFO - --- ALL MODELS INACTIVE: BOT OFFLINE ---
+2026-02-23 13:05:38,436 - INFO - --- ALL MODELS INACTIVE: BOT OFFLINE ---
+2026-02-23 17:02:05,274 - INFO - --- BOT ACTIVE: Skye Carter (Model: openrouter/free) ---
+2026-02-23 17:04:53,228 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-23 17:05:00,791 - INFO - Update id=681472638 is handled. Duration 20175 ms by bot id=7756198924
+2026-02-23 17:05:03,966 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-23 17:05:04,391 - INFO - Update id=681472639 is handled. Duration 3563 ms by bot id=7756198924
+2026-02-23 17:07:22,457 - INFO - --- BOT ACTIVE: Skye Carter (Model: openrouter/free) ---
+2026-02-23 17:07:55,492 - INFO - --- BOT ACTIVE: Skye Carter (Model: openrouter/free) ---
+2026-02-23 17:14:34,436 - INFO - --- BOT ACTIVE: Skye Carter (Model: openrouter/free) ---
+2026-02-23 17:14:45,594 - INFO - --- BOT ACTIVE: Skye Carter (Model: openrouter/free) ---
+2026-02-23 17:14:56,218 - INFO - --- BOT ACTIVE: Skye Carter (Model: openrouter/free) ---
+2026-02-23 17:15:26,728 - INFO - --- BOT ACTIVE: Skye Carter (Model: openrouter/free) ---
+2026-02-23 17:29:56,188 - INFO - --- BOT ACTIVE: Skye Carter (Model: openrouter/free) ---
+2026-02-23 17:30:36,817 - INFO - Closing previous bot session...
+2026-02-23 17:30:37,338 - INFO - --- BOT ACTIVE: Skye Carter (Model: openrouter/free-fake) ---
+2026-02-23 17:30:47,931 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 400 Bad Request"
+2026-02-23 17:30:47,941 - ERROR - Error in chat_handler: Error code: 400 - {'error': {'message': 'openrouter/free-fake is not a valid model ID', 'code': 400}, 'user_id': 'user_2xzC0bmiU6qvAkcEUaU5uPEH91R'}
+Traceback (most recent call last):
+  File "/code/app/main.py", line 347, in chat_handler
+    res = await local_ai_client.chat.completions.create(
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/openai/resources/chat/completions/completions.py", line 2678, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/openai/_base_client.py", line 1884, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/openai/_base_client.py", line 1669, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.BadRequestError: Error code: 400 - {'error': {'message': 'openrouter/free-fake is not a valid model ID', 'code': 400}, 'user_id': 'user_2xzC0bmiU6qvAkcEUaU5uPEH91R'}
+2026-02-23 17:30:48,308 - INFO - Update id=681472640 is handled. Duration 1338 ms by bot id=7756198924
+2026-02-23 17:31:19,295 - INFO - Closing previous bot session...
+2026-02-23 17:31:19,778 - INFO - --- BOT ACTIVE: Skye Carter (Model: openrouter/free) ---
+2026-02-23 17:37:07,308 - INFO - --- BOT ACTIVE: Skye Carter (Model: openrouter/free) ---
+2026-02-23 17:37:17,911 - INFO - --- BOT ACTIVE: Skye Carter (Model: openrouter/free) ---
+2026-02-23 17:37:35,741 - INFO - --- BOT ACTIVE: Skye Carter (Model: openrouter/free) ---
+2026-02-23 17:40:02,647 - INFO - --- BOT ACTIVE: Skye Carter (Model: openrouter/free) ---
+2026-02-23 17:55:08,929 - INFO - --- BOT ACTIVE: Skye Carter (Model: openrouter/free) ---
+2026-02-23 17:55:25,245 - INFO - --- BOT ACTIVE: Skye Carter (Model: openrouter/free) ---
+2026-02-23 17:56:35,021 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-23 17:57:26,898 - INFO - Update id=681472641 is handled. Duration 3 ms by bot id=7756198924
+2026-02-23 17:59:34,367 - INFO - Update id=681472641 is handled. Duration 187488 ms by bot id=7756198924
+2026-02-23 18:00:17,047 - INFO - --- BOT ACTIVE: Skye Carter (Model: openrouter/free) ---
+2026-02-23 18:00:51,136 - INFO - --- BOT ACTIVE: Skye Carter (Model: openrouter/free) ---
+2026-02-23 18:01:20,172 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-23 18:01:36,338 - INFO - Update id=681472642 is handled. Duration 20277 ms by bot id=7756198924
+2026-02-24 15:52:09,039 - INFO - --- ALL MODELS INACTIVE: BOT OFFLINE ---
+2026-02-25 17:28:42,674 - INFO - --- ALL MODELS INACTIVE: BOT OFFLINE ---

@@ -1,0 +1,40 @@
+Jeśli chodzi o pisanie skryptów, nie musisz nikomu tego zlecać (ani płacić copywriterom). Najlepsze scenariusze GFE (Girlfriend Experience) i Roleplay napiszesz przy pomocy samego AI, jeśli tylko dobrze je poinstruujesz.
+
+Możesz użyć do tego ChatGPT (GPT-4o) lub Claude 3.5 Sonnet na co dzień. Wystarczy, że wkleisz im swój Core System Prompt (ten o Skye z Miami) i poprosisz:
+"To jest rdzeń mojej postaci. Napisz mi 5 krótkich, dynamicznych skryptów w pierwszej osobie, które dokleję do jej pamięci. Podziel je na pory dnia. Skrypty mają zawierać instrukcje, jak ma się zachowywać, w co jest ubrana i jak ma teasować użytkownika." AI wypluje Ci gotowce, które tylko wkleisz do naszego nowego panelu.
+
+🔥 Najlepsze "Uncensored" (Nieocenzurowane) modele na OpenRouterze
+Jeśli chodzi o to, jaki model wpisać w panelu Admina w polu AI Model ID, żeby bot nie blokował się przy pikantnych tematach (NSFW, ostre GFE, sprzedaż), OpenRouter to absolutna kopalnia złota. Modele od OpenAI (GPT) czy Google (Claude) domyślnie mają filtry, ale społeczność open-source tworzy modele specjalnie pod Roleplay.
+
+Oto absolutny top na ten moment (wystarczy wpisać te ID w naszym panelu):
+
+1. Król Roleplayu (High-End):
+
+ID: sao10k/l3.1-euryale-70b
+
+Dlaczego: To obecnie jeden z najpotężniejszych modeli na świecie wyuczony specjalnie pod nieskrępowany Roleplay, GFE i zawartość NSFW. Jest niesamowicie kreatywny, doskonale rozumie emocje, uwielbia budować napięcie i nie ma żadnych filtrów.
+
+Cena: Średnia/Wyższa (ok. $0.35 - $0.40 za 1M tokenów).
+
+2. Budżetowy Klasyk (Tani i szybki):
+
+ID: gryphe/mythomax-l2-13b
+
+Dlaczego: Legenda w branży AI NSFW. Jest bardzo szybki, absurdalnie tani i "z natury" napalony, jeśli odpowiednio go poinstruujesz. Świetnie radzi sobie z prostymi konwersacjami i sprzedażą PPV. Idealny dla darmowych użytkowników z Instagrama.
+
+Cena: Bardzo niska (często zrabatowany prawie do zera, standardowo grosze za 1M tokenów).
+
+3. Nowoczesny Złoty Środek:
+
+ID: neversleep/llama-3.1-lumimaid-8b (lub 70b)
+
+Dlaczego: Seria "Lumimaid" od grupy Neversleep to najnowsze finetuny oryginalnego modelu Llama 3.1 od Mety, odblokowane i wytrenowane na potężnych bazach danych z literaturą erotyczną i skryptami GFE. Model 8B jest bardzo tani i super inteligentny.
+
+4. Wszechstronny Gigant (Smart & Uncensored):
+
+ID: nousresearch/hermes-3-llama-3.1-405b
+
+Dlaczego: Hermes to genialna linia modeli. Odblokowana z filtrów moralnych, potężna inteligencja (405 miliardów parametrów - poziom GPT-4). Doskonale i sztywno trzyma się skryptów, nigdy nie gubi postaci. Wymaga nieco większego budżetu.
+
+💡 Moja rekomendacja strategiczna:
+Ustaw na początek neversleep/llama-3.1-lumimaid-8b lub klasycznego gryphe/mythomax-l2-13b dla zwykłego ruchu. Sprawdzą się idealnie z naszym systemem scenariuszy.
